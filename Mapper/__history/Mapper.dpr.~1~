@@ -1,0 +1,22 @@
+program Mapper;
+
+uses
+  Forms,
+  GetGoogle in '..\Google\GetGoogle.pas' {WForm},
+  GoogleDownload in '..\GoogleDownload.pas',
+  AsdbMap in '..\AsdbMap.pas',
+  MainFm in 'MainFm.pas' {MainForm},
+  TestForm in '..\TestForm.pas' {TestFm},
+  NewMark in '..\NewMark.pas' {NewMarkerForm};
+
+{$R *.res}
+
+begin
+  Application.Initialize;
+  Application.CreateForm(TWForm, WForm);
+  Application.CreateForm(TMainForm, MainForm);
+  Application.CreateForm(TTestFm, TestFm);
+  Application.CreateForm(TTestFm, TestFm);
+  Application.CreateForm(TNewMarkerForm, NewMarkerForm);
+  Application.Run;
+end.

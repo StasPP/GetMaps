@@ -1,0 +1,28 @@
+unit CoordSysFm;
+
+interface
+
+uses
+  Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
+  Dialogs, ExtCtrls, StdCtrls;
+
+type
+  TCSForm = class(TForm)
+    ComboBox2: TComboBox;
+    ListBox4: TListBox;
+    Button1: TButton;
+    Bevel1: TBevel;
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  CSForm: TCSForm;
+
+implementation
+
+{$R *.dfm}
+
+end.

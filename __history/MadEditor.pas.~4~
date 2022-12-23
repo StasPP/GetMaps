@@ -1,0 +1,45 @@
+unit MadEditor;
+
+interface
+
+uses MapFunctions, GeoFunctions, TabFunctions, Vectors2,
+     AbstractCanvas, AbstractDevices, AsphyreImages, AsphyreTypes, AsphyreDb,
+     Classes, FLoader, SysUtils, GeoClasses, GeoString, Dialogs, DrawFunctions,
+     BasicMapObjects;
+
+
+ ///// MapEditor
+  procedure GetMapsUnderPoint(B,L: Double);
+  procedure MapInfoHUD;
+
+//  procedure SaveToAsdb(FileName: String);
+//  procedure MapUp(I:Integer);
+//  pocedure MapDown(I:Integer);
+
+
+ //// RouteEditor
+
+ /// ...
+
+  var
+
+  ChoosedMaps:array of Integer;
+  MapChoosed: integer = -1;
+  WaitForChoose : boolean;
+
+
+implementation
+
+procedure GetMapsUnderPoint(B,L: Double);
+begin
+
+end;
+
+procedure MapInfoHUD;
+begin
+
+end;
+
+
+
+end.

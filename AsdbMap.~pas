@@ -1,0 +1,264 @@
+unit AsdbMap;
+
+interface  
+
+uses SysUtils, Classes, ExtCtrls,
+  Jpeg, GraphicEx, GeoFunctions, GeoFiles, GeoString, GeoClasses,
+  AsphyreBmpLoad, AsphyreDb, ImageFX, Math,
+  ExtDlgs;
+
+  procedure InitAsdbContainer;
+  procedure PackFilesToAsdb;
+  procedure AddBoundsToList;
+
+implementation
+
+var
+    BoundList :TStringList;
+
+
+procedure InitAsdbContainer;
+var
+ PxFm: TPxFm;
+ pSize: TPoint;
+ Image: TBitmap;
+ Dest: TBitmap;
+ Tolerance: Integer;
+ MaskColor: Cardinal;
+ IsMasked: Boolean;
+ Stream: TMemoryStream;
+ FStream: TFileStream;
+ Asdb :TASdb;
+
+ AName : String;
+ i, j : integer;
+ iMax : integer;
+begin
+
+ if not GeoReady then
+ exit;
+
+ Savedialog2.FileName := ImgFName+'.asdb';
+
+ if not Savedialog2.Execute then
+   exit;
+
+ AName := Savedialog2.FileName;
+
+ if Copy(AName, Length(Aname)-4,5)<>'.asdb' then
+     AName := AName + '.asdb';
+
+    
+ if fileexists(AName) then
+ Begin
+   if MessageDlg('???????????? ???????????? ????? '+#13+AName, MtConfirmation, [mbYes, mbNo],0) <> 6 then
+     exit;
+ End;
+
+ PB.Visible := true;
+ PB.Position := 0;
+
+ Repaint;
+ CropImg;
+ CountTiles;
+ PB.Position := 10;
+ Repaint;
+
+ Asdb := TAsdb.Create(Form1);
+
+ // update VTDb archive
+ ASDb.FileName:= AName;
+
+ if (not ASDb.Update()) then
+  begin
+   ShowMessage('Failed opening ASDb archive!');
+   Exit;
+  end;
+
+ // change the following format, if necessary
+ PxFm.Format:= COLOR_A8R8G8B8;
+
+ // retreive Texture Size from edit boxes
+ PxFm.TextureWidth := 512;
+ PxFm.TextureHeight:= 512;
+
+ // retreive Pattern Size from edit boxes
+ PxFm.PatternWidth := 512;
+ PxFm.PatternHeight:= 512;
+
+ // this variable is used for better readability only
+ pSize:= Point(PxFm.PatternWidth, PxFm.PatternHeight);
+
+ // this size can be smaller than pattern size to add padding
+ PxFm.VisibleWidth := PxFm.PatternWidth;
+ PxFm.VisibleHeight:= PxFm.PatternHeight;
+
+ // retreive mask color and tolerance
+ IsMasked:= true;
+ MaskColor:= PColor and $FFFFFF;
+ Tolerance:= 1;
+
+ repaint;
+
+ for i := 0 to NX-1 do
+    for j := 0 to NY-1 do
+    Begin
+      // load source bitmap
+      Image:= TBitmap.Create();
+      if (not LoadBitmap(TmpDir+IntToStr(i)+'_'+IntToStr(j)+'.bmp', Image, ifAuto)) then
+      begin
+        ShowMessage('Failed loading source bitmap!');
+        Image.Free();
+        //Exit;
+        Continue;
+      end;
+
+      PxFm.PatternCount:= (Image.Width div pSize.X) * (Image.Height div pSize.Y);
+
+      Dest:= TBitmap.Create();
+      TileBitmap(Dest, Image, Point(PxFm.TextureWidth, PxFm.TextureHeight),
+          pSize, pSize, IsMasked, MaskColor, Tolerance);
+
+      Image.Free();
+
+      PxFm.TextureCount:= Dest.Height div PxFm.TextureHeight;
+
+      Stream:= TMemoryStream.Create();
+      WriteBitmapPxFm(Stream, Dest, PxFm);
+
+      Dest.Free();
+
+      Stream.Seek(0, soFromBeginning);
+
+      // write PxFm-formatted image data to ASDb
+      if (not ASDb.WriteStream(ImgFName+'_'+IntToStr(i)+'_'+IntToStr(j), Stream, recGraphics)) then
+      begin
+        ShowMessage('Failed writing stream to VTDb archive.');
+      end; {else ShowMessage(Edit2.Text + ' key added!');}
+
+      Stream.Free();
+
+      PB.Position := trunc((i*NY+j)/NX/NY*50+10);
+      PB.Repaint;
+   end;
+
+
+ // ADD SMALL
+ PxFm.Format:= COLOR_A8R8G8B8;
+ PxFm.TextureWidth := 128;
+ PxFm.TextureHeight:= 128;
+ PxFm.PatternWidth := 128;
+ PxFm.PatternHeight:= 128;
+ pSize:= Point(PxFm.PatternWidth, PxFm.PatternHeight);
+ PxFm.VisibleWidth := PxFm.PatternWidth;
+ PxFm.VisibleHeight:= PxFm.PatternHeight;
+ IsMasked:= true;
+ MaskColor:= PColor and $FFFFFF;
+ Tolerance:= 1;
+ repaint;
+
+ for i := 0 to NX-1 do
+    for j := 0 to NY-1 do
+    Begin
+      Image:= TBitmap.Create();
+      if (not LoadBitmap(TmpDir+IntToStr(i)+'_'+IntToStr(j)+'_s.bmp', Image, ifAuto)) then
+      begin
+        ShowMessage('Failed loading source bitmap!');
+        Image.Free();
+        Continue;
+      end;
+
+      PxFm.PatternCount:= (Image.Width div pSize.X) * (Image.Height div pSize.Y);
+      Dest:= TBitmap.Create();
+      TileBitmap(Dest, Image, Point(PxFm.TextureWidth, PxFm.TextureHeight),
+          pSize, pSize, IsMasked, MaskColor, Tolerance);
+      Image.Free();
+      PxFm.TextureCount:= Dest.Height div PxFm.TextureHeight;
+      Stream:= TMemoryStream.Create();
+      WriteBitmapPxFm(Stream, Dest, PxFm);
+      Dest.Free();
+      Stream.Seek(0, soFromBeginning);
+
+      // write PxFm-formatted image data to ASDb
+      if (not ASDb.WriteStream(ImgFName+'_'+IntToStr(i)+'_'+IntToStr(j)+'_s', Stream, recGraphics)) then
+      begin
+        ShowMessage('Failed writing stream to VTDb archive.');
+      end; {else ShowMessage(Edit2.Text + ' key added!');}
+
+      Stream.Free();
+      PB.Position := trunc((i*NY+j)/NX/NY*30+60);
+      PB.Repaint;
+   end;
+
+ // ADD TINY
+ PxFm.Format:= COLOR_A8R8G8B8;
+ PxFm.TextureWidth := 32;
+ PxFm.TextureHeight:= 32;
+ PxFm.PatternWidth := 32;
+ PxFm.PatternHeight:= 32;
+ pSize:= Point(PxFm.PatternWidth, PxFm.PatternHeight);
+ PxFm.VisibleWidth := PxFm.PatternWidth;
+ PxFm.VisibleHeight:= PxFm.PatternHeight;
+ IsMasked:= true;
+ MaskColor:= PColor and $FFFFFF;
+ Tolerance:= 1;
+ repaint;
+
+ for i := 0 to NX-1 do
+    for j := 0 to NY-1 do
+    Begin
+      Image:= TBitmap.Create();
+      if (not LoadBitmap(TmpDir+IntToStr(i)+'_'+IntToStr(j)+'_t.bmp', Image, ifAuto)) then
+      begin
+        ShowMessage('Failed loading source bitmap!');
+        Image.Free();
+        Continue;
+      end;
+
+      PxFm.PatternCount:= (Image.Width div pSize.X) * (Image.Height div pSize.Y);
+      Dest:= TBitmap.Create();
+      TileBitmap(Dest, Image, Point(PxFm.TextureWidth, PxFm.TextureHeight),
+          pSize, pSize, IsMasked, MaskColor, Tolerance);
+      Image.Free();
+      PxFm.TextureCount:= Dest.Height div PxFm.TextureHeight;
+      Stream:= TMemoryStream.Create();
+      WriteBitmapPxFm(Stream, Dest, PxFm);
+      Dest.Free();
+      Stream.Seek(0, soFromBeginning);
+
+      // write PxFm-formatted image data to ASDb
+      if (not ASDb.WriteStream(ImgFName+'_'+IntToStr(i)+'_'+IntToStr(j)+'_t', Stream, recGraphics)) then
+      begin
+        ShowMessage('Failed writing stream to VTDb archive.');
+      end; {else ShowMessage(Edit2.Text + ' key added!');}
+
+      Stream.Free();
+      PB.Position := trunc((i*NY+j)/NX/NY*10+90);
+      PB.Repaint;
+   end;
+
+
+ FStream := TFileStream.Create(Tmpdir+ImgFName+'.txt', fmOpenRead);
+ Asdb.WriteStream(ImgFName+'.txt', FStream,  recFile);
+
+ Fstream.Free;
+ Asdb.Free;
+ //Asdb.Destroy;
+
+ PB.Visible := false;
+ PB.Position := 0;
+
+ ShowMessage('???? ASDB ???????? ???????!');
+end;
+
+procedure PackFilesToAsdb;
+begin
+//
+end;
+
+procedure AddBoundsToList;
+begin
+//
+end;
+
+end.

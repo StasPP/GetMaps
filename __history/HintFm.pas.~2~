@@ -1,0 +1,24 @@
+unit HintFm;
+
+interface
+
+uses
+  Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
+  Dialogs;
+
+type
+  THintForm = class(TForm)
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  HintForm: THintForm;
+
+implementation
+
+{$R *.dfm}
+
+end.

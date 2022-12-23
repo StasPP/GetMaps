@@ -1,0 +1,193 @@
+unit GoogleDownload;
+
+/////// 512 x 512 tiles only
+/////// 2017 Shevchuk Stanislav
+
+interface
+
+ uses IdBaseComponent, IdComponent, IdTCPConnection,
+     IdTCPClient, IdHTTP, JPEG, GeoClasses, GeoFunctions, GeoFiles, GeoString,
+     Math, SysUtils, Graphics, ExtCtrls, Classes;
+
+ type TBLRect = Record
+   B, L :array[1..4] of Double;
+ end;
+
+ function GetGoogleStaticMapURL( B,L: double; MapStyle, GoogleKey :string;
+                                    ZoomLevel: integer):string;
+
+ procedure GetGoogleStaticMap( URL:string; var Image:TImage);
+
+ function GetBLBounds(B,L: Double; ZoomLevel:Integer):TBLRect;
+
+ procedure GetNextBLUp (B,L: Double; ZoomLevel:Integer; var NewB, NewL : Double);
+ procedure GetNextBLDown (B,L: Double; ZoomLevel:Integer; var NewB, NewL : Double);
+ procedure GetNextBLLeft (B,L: Double; ZoomLevel:Integer; var NewB, NewL : Double);
+ procedure GetNextBLRight (B,L: Double; ZoomLevel:Integer; var NewB, NewL : Double);
+
+implementation
+
+const
+  GoogleTileScales: array [0..20] of double = (156412, 78206, 39103, 19551, 9776, 4888,
+                                      2444, 1222, 610.984, 305.492, 152.746,
+                                      76.373, 38.187, 19.093, 9.547, 4.773,
+                                      2.387, 1.193, 0.596, 0.298, 0.149);
+
+procedure GetGoogleStaticMap(URL:String; var Image: TImage);
+var
+  StreamData :TMemoryStream;
+  JPEGImage  : TJPEGImage;
+  IdHttp:TIdHttp;
+begin
+
+  IdHttp := TIdHttp.Create(nil);
+
+  IdHTTP.ProxyParams.ProxyPort := 8080;
+  IdHttp.request.useragent :=
+  'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0; MAAU)';
+
+  StreamData := TMemoryStream.Create;
+  JPEGImage  := TJPEGImage.Create;
+  try
+    try
+     Idhttp.Get(Url, StreamData); //Send the request and get the image
+     StreamData.Seek(0,soFromBeginning);
+     JPEGImage.LoadFromStream(StreamData);//load the image in a Stream
+     Image.Picture.Assign(JPEGImage);//Load the image in a Timage component
+    Except On E : Exception Do
+       Image.Picture.Bitmap.Canvas.Textout(10,10,'Exception: '+E.Message);
+    End;
+  finally
+    StreamData.free;
+    JPEGImage.Free;
+  end;
+
+  IdHttp.Destroy;
+end;
+
+function GetGoogleStaticMapURL(B, L: double; MapStyle,
+  GoogleKey: string; ZoomLevel: integer): string;
+var DS :Char;
+
+begin
+  DS := DecimalSeparator;
+  DecimalSeparator :='.';
+
+  Result :='http://maps.google.com/maps/api/staticmap?' +
+  'center='+ Format('%.11f',[B])+',' + Format('%.11f',[L])+
+  '&zoom=' + IntTostr(ZoomLevel) +
+  '&size=512x542' +
+  '&maptype='+MapStyle +
+  '&format=jpg' +
+  '&sensor=false'+
+  '&scale=1'+
+  '&key='+GoogleKey;
+
+  DecimalSeparator := DS;
+end;
+
+function GetBLBounds(B,L: Double; ZoomLevel:Integer):TBLRect;
+var X, Y :Double;
+    NewX, NewY :Double;
+    Scale :Double;
+    WGS :Integer;
+begin
+
+  //// Coordinates for Points of Image: (0,0) (512,0) (0,512) (512,512)
+
+  WGS  := FindDatum('WGS84');
+
+  PVMtoUTM  (WGS, B, L, Y, X);
+  Scale := GoogleTileScales[ZoomLevel];
+
+  NewY := Y - Scale*256 - Scale*15;   {Copyright zone}
+  NewX := X - Scale*256;
+  UTMToPVM(WGS,  NewY, NewX, Result.B[1], Result.L[1]);
+
+  NewY := Y - Scale*256 - Scale*15;   {Copyright zone}
+  NewX := X + Scale*256;
+  UTMToPVM(WGS,  NewY, NewX, Result.B[2], Result.L[2]);
+
+  NewY := Y + Scale*256 - Scale*15;   {Copyright zone}
+  NewX := X - Scale*256;
+  UTMToPVM(WGS,  NewY, NewX, Result.B[3], Result.L[3]);
+
+  NewY := Y + Scale*256 - Scale*15;   {Copyright zone}
+  NewX := X + Scale*256;
+  UTMToPVM(WGS,  NewY, NewX, Result.B[4], Result.L[4]);
+end;
+
+//////////////////////// NEXT To --------------------------
+
+procedure GetNextBLUp (B,L: Double; ZoomLevel:Integer; var NewB, NewL : Double);
+var WGS : Integer;
+    X, Y :Double;
+    NewX, NewY :Double;
+    Scale : Double;
+begin
+    WGS  := FindDatum('WGS84');
+
+    PVMtoUTM  (WGS, B, L, Y, X);
+    Scale := GoogleTileScales[ZoomLevel];
+
+    NewY := Y + Scale*512;
+    NewX := X;
+
+    UTMToPVM(WGS, NewY, NewX, NewB, NewL);
+end;
+
+procedure GetNextBLDown (B,L: Double; ZoomLevel:Integer; var NewB, NewL : Double);
+var WGS : Integer;
+    X, Y :Double;
+    NewX, NewY :Double;
+    Scale : Double;
+begin
+    WGS  := FindDatum('WGS84');
+
+    PVMtoUTM  (WGS, B, L, Y, X);
+    Scale := GoogleTileScales[ZoomLevel];
+
+    NewY := Y - Scale*512;
+    NewX := X;
+
+    UTMToPVM(WGS, NewY, NewX, NewB, NewL);
+end;
+
+procedure GetNextBLLeft (B,L: Double; ZoomLevel:Integer; var NewB, NewL : Double);
+var WGS : Integer;
+    X, Y :Double;
+    NewX, NewY :Double;
+    Scale : Double;
+begin
+    WGS  := FindDatum('WGS84');
+
+    PVMtoUTM  (WGS, B, L, Y, X);
+    Scale := GoogleTileScales[ZoomLevel];
+
+    NewY := Y;
+    NewX := X - Scale*512;
+
+    UTMToPVM(WGS, NewY, NewX, NewB, NewL);
+end;
+
+procedure GetNextBLRight (B,L: Double; ZoomLevel:Integer; var NewB, NewL : Double);
+var WGS : Integer;
+    X, Y :Double;
+    NewX, NewY :Double;
+    Scale : Double;
+begin
+    WGS  := FindDatum('WGS84');
+
+    PVMtoUTM  (WGS, B, L, Y, X);
+    Scale := GoogleTileScales[ZoomLevel];
+
+    NewY := Y;
+    NewX := X + Scale*512;
+
+    UTMToPVM(WGS, NewY, NewX, NewB, NewL);
+end;
+
+/////////////////////////////////////////////////////------------
+
+end.
+ 

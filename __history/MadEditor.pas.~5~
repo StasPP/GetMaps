@@ -1,0 +1,56 @@
+unit MadEditor;
+
+interface
+
+uses MapFunctions, GeoFunctions, TabFunctions, Vectors2,
+     AbstractCanvas, AbstractDevices, AsphyreImages, AsphyreTypes, AsphyreDb,
+     Classes, FLoader, SysUtils, GeoClasses, GeoString, Dialogs, DrawFunctions,
+     BasicMapObjects;
+
+
+ ///// MapEditor
+  procedure GetMapsUnderPoint(B,L: Double);
+  procedure MapInfoHUD;
+
+//  procedure SaveToAsdb(FileName: String);
+//  procedure MapUp(I:Integer);
+//  pocedure MapDown(I:Integer);
+
+
+ //// RouteEditor
+
+ /// ...
+
+  var
+
+  ChoosedMaps:array of Integer;
+  WaitForChoose : boolean;
+
+
+implementation
+
+procedure GetMapsUnderPoint(B,L: Double);
+var I:Integer;
+    P :TMyPoint;
+begin
+  for I := 0 to Length(MapList) - 1 do
+  Begin
+    P := BLToMap(B, L);
+    if (P.x > MapList[I].x[1]) and (P.x < MapList[I].x[4]) and
+       (P.y > MapList[I].y[1]) and (P.y < MapList[I].y[4])  then
+        Begin
+
+          break;
+        End;
+
+  End;
+end;
+
+procedure MapInfoHUD;
+begin
+
+end;
+
+
+
+end.

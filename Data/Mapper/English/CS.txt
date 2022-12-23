@@ -1,0 +1,24 @@
+Krasowsky
+SK-42
+SK-95
+GOST R
+GOST
+Zone
+ E 
+ W 
+ N 
+ S 
+Cartesian coordinates
+Pulkovo
+Northern hemisphere
+Southern hemisphere
+Rectangular (Cartesian)
+Latitude
+Longtitude
+Gauss-Kruger
+SK42
+SK95
+ E 
+ W 
+ N 
+ S 

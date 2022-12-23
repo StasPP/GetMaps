@@ -1,0 +1,183 @@
+object MainForm: TMainForm
+  Left = 0
+  Top = 0
+  BorderStyle = bsSingle
+  Caption = 'RouteNav by Shevchuk S.'
+  ClientHeight = 572
+  ClientWidth = 794
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  OldCreateOrder = False
+  Position = poScreenCenter
+  Scaled = False
+  OnActivate = FormActivate
+  OnClose = FormClose
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  OnKeyDown = FormKeyDown
+  OnMouseWheelDown = FormMouseWheelDown
+  OnMouseWheelUp = FormMouseWheelUp
+  OnResize = FormResize
+  OnShow = FormShow
+  PixelsPerInch = 96
+  TextHeight = 13
+  object Panel1: TPanel
+    Left = 0
+    Top = 169
+    Width = 794
+    Height = 368
+    Cursor = crArrow
+    Align = alClient
+    BevelOuter = bvNone
+    TabOrder = 0
+    OnMouseDown = Panel1MouseDown
+    OnMouseMove = Panel1MouseMove
+    OnMouseUp = Panel1MouseUp
+    OnResize = Panel1Resize
+  end
+  object Panel3: TPanel
+    Left = 0
+    Top = 537
+    Width = 794
+    Height = 35
+    Align = alBottom
+    BevelOuter = bvNone
+    TabOrder = 1
+    object Panel4: TPanel
+      Left = 0
+      Top = 0
+      Width = 129
+      Height = 35
+      Align = alLeft
+      BevelOuter = bvNone
+      ParentBackground = False
+      ParentColor = True
+      TabOrder = 0
+      object SpeedButton1: TSpeedButton
+        Left = 4
+        Top = 4
+        Width = 28
+        Height = 28
+        Glyph.Data = {
+          F6000000424DF600000000000000760000002800000010000000100000000100
+          0400000000008000000000000000000000001000000000000000000000000000
+          8000008000000080800080000000800080008080000080808000C0C0C0000000
+          FF0000FF000000FFFF00FF000000FF00FF00FFFF0000FFFFFF00DDDDDDDDDDDD
+          DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD8888DD8888DDDDDD8008DD800
+          8DDDDDD8008DD8008DDDDDD8008DD8008DDDDDD8008DD8008DDDDDD8008DD800
+          8DDDDDD8008DD8008DDDDDD8008DD8008DDDDDD8008DD8008DDDDDD8008DD800
+          8DDDDDD8888DD8888DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD}
+        OnClick = SpeedButton1Click
+      end
+      object SpeedButton2: TSpeedButton
+        Left = 34
+        Top = 4
+        Width = 28
+        Height = 28
+        Glyph.Data = {
+          F6000000424DF600000000000000760000002800000010000000100000000100
+          0400000000008000000000000000000000001000000000000000000000000000
+          8000008000000080800080000000800080008080000080808000C0C0C0000000
+          FF0000FF000000FFFF00FF000000FF00FF00FFFF0000FFFFFF00DDDDDDDDDDDD
+          DDDDDDDDDDDDDDDDDDDDDDDD88DDDDDDDDDDDDDD8A8DDDDDDDDDDDDD8AA8DDDD
+          DDDDDDDD8AAA8DDDDDDDDDDD8AAAA8DDDDDDDDDD8AAAAA8DDDDDDDDD8AAAAAA8
+          DDDDDDDD8AAAAA8DDDDDDDDD8AAAA8DDDDDDDDDD8AAA8DDDDDDDDDDD8AA8DDDD
+          DDDDDDDD8A8DDDDDDDDDDDDD88DDDDDDDDDDDDDDDDDDDDDDDDDD}
+        OnClick = SpeedButton2Click
+      end
+      object SpeedButton3: TSpeedButton
+        Left = 64
+        Top = 4
+        Width = 28
+        Height = 28
+        Glyph.Data = {
+          F6000000424DF600000000000000760000002800000010000000100000000100
+          0400000000008000000000000000000000001000000000000000000000000000
+          8000008000000080800080000000800080008080000080808000C0C0C0000000
+          FF0000FF000000FFFF00FF000000FF00FF00FFFF0000FFFFFF00DDDDDDDDDDDD
+          DDDDDDDDDDDDDDDDDDDDDDDDDD88DDDD88DDDDDDD818DDD818DDDDDD8118DD81
+          18DDDDD81118D81118DDDD811118811118DDD8111118111118DD811111181111
+          18DDD8111118111118DDDD811118811118DDDDD81118D81118DDDDDD8118DD81
+          18DDDDDDD818DDD818DDDDDDDD88DDDD88DDDDDDDDDDDDDDDDDD}
+        OnClick = SpeedButton3Click
+      end
+      object SpeedButton4: TSpeedButton
+        Left = 94
+        Top = 4
+        Width = 28
+        Height = 28
+        Glyph.Data = {
+          F6000000424DF600000000000000760000002800000010000000100000000100
+          0400000000008000000000000000000000001000000000000000000000000000
+          8000008000000080800080000000800080008080000080808000C0C0C0000000
+          FF0000FF000000FFFF00FF000000FF00FF00FFFF0000FFFFFF00DDDDDDDDDDDD
+          DDDDDDDDDDDDDDDDDDDDD88DDDD88DDDDDDDD8C8DDD8C8DDDDDDD8CC8DD8CC8D
+          DDDDD8CCC8D8CCC8DDDDD8CCCC88CCCC8DDDD8CCCCC8CCCCC8DDD8CCCCC8CCCC
+          CC8DD8CCCCC8CCCCC8DDD8CCCC88CCCC8DDDD8CCC8D8CCC8DDDDD8CC8DD8CC8D
+          DDDDD8C8DDD8C8DDDDDDD88DDDD88DDDDDDDDDDDDDDDDDDDDDDD}
+        OnClick = SpeedButton4Click
+      end
+    end
+    object PBar: TProgressBar
+      Left = 129
+      Top = 0
+      Width = 665
+      Height = 35
+      Align = alClient
+      Smooth = True
+      TabOrder = 1
+    end
+  end
+  object Panel5: TPanel
+    Left = 0
+    Top = 0
+    Width = 794
+    Height = 169
+    Align = alTop
+    Caption = 'Test'
+    TabOrder = 2
+    Visible = False
+    object RxMemo: TMemo
+      Left = 1
+      Top = 1
+      Width = 792
+      Height = 103
+      Align = alClient
+      ReadOnly = True
+      TabOrder = 0
+      OnKeyUp = RxMemoKeyUp
+    end
+    object RxMemo2: TMemo
+      Left = 1
+      Top = 104
+      Width = 792
+      Height = 64
+      Align = alBottom
+      Color = clBtnFace
+      ReadOnly = True
+      TabOrder = 1
+      OnKeyUp = RxMemoKeyUp
+    end
+  end
+  object PopupMenu1: TPopupMenu
+    Left = 472
+    Top = 112
+    object N1: TMenuItem
+      Caption = #1044#1086#1073#1072#1074#1080#1090#1100' '#1085#1086#1074#1099#1081' '#1084#1072#1088#1082#1077#1088
+      OnClick = N1Click
+    end
+    object N2: TMenuItem
+      Caption = #1055#1077#1088#1077#1084#1077#1089#1090#1080#1090#1100' '#1073#1072#1079#1091
+      OnClick = N2Click
+    end
+    object N3: TMenuItem
+      Caption = #1059#1076#1072#1083#1080#1090#1100
+      Visible = False
+      OnClick = N3Click
+    end
+  end
+end

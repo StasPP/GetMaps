@@ -1,0 +1,99 @@
+unit GetGoogle;
+
+interface
+
+uses
+  Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
+  Dialogs, ImgList, ExtCtrls, StdCtrls, Jpeg;
+
+type
+  TWForm = class(TForm)
+    RadioGroup1: TRadioGroup;
+    RadioGroup2: TRadioGroup;
+    GroupBox1: TGroupBox;
+    Label1: TLabel;
+    ComboBox1: TComboBox;
+    Button1: TButton;
+    Edit1: TEdit;
+    CheckBox1: TCheckBox;
+    Label2: TLabel;
+    Image1: TImage;
+    Bevel1: TBevel;
+    Label4: TLabel;
+    ComboBox2: TComboBox;
+    Bevel2: TBevel;
+    ImageList1: TImageList;
+    procedure ComboBox1Change(Sender: TObject);
+    procedure Button1Click(Sender: TObject);
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  WForm: TWForm;
+  S: TStringList;
+implementation
+
+uses Unit1;
+
+{$R *.dfm}
+
+procedure TWForm.ComboBox1Change(Sender: TObject);
+var
+  S: string;
+const
+  MapStyles: array [0..3] of String =
+    ('road','sat','hyb','ter');
+
+begin
+   S := MapStyles[Combobox1.ItemIndex] + Combobox2.Items[Combobox2.ItemIndex];
+  Image1.Picture.LoadFromFile('Data\Scales\'+s+'.jpg');
+end;
+
+procedure TWForm.Button1Click(Sender: TObject);
+begin
+  if Radiogroup2.ItemIndex=-1 then
+  begin
+    ShowMessage('«адайте примерное местоположение участка работ!');
+    exit;
+  end;
+
+  SetCurrentDir(Form1.MyDir);
+
+  if Edit1.Text <>'' then
+  Begin
+    if S.Count<1 then
+      S.Add(Edit1.Text)
+      else
+       S[0] := Edit1.Text;
+     S.SaveToFile('Data\Googlekey.txt');
+  End;
+
+
+  close;
+end;
+
+procedure TWForm.FormCreate(Sender: TObject);
+begin
+  S:= TStringList.Create;
+
+  if Fileexists('Data\Googlekey.txt') then
+  Begin
+    S.LoadFromFile('Data\Googlekey.txt');
+    Edit1.Text := s[0];
+    if Edit1.Text<>'' then
+      CheckBox1.Checked := true;
+  End;
+
+end;
+
+procedure TWForm.FormDestroy(Sender: TObject);
+begin
+ S.Destroy;
+end;
+
+end.

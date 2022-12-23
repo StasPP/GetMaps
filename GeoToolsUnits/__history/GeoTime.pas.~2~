@@ -1,0 +1,48 @@
+unit GeoTime;
+
+uses DateUtils, Classes;
+
+function GetLeapSecond(Date:TDate):integer;
+
+function TimeFromDoy(Y : Integer; T: Word): TDateTime;
+
+function TimeFromWeekSec(T: Word): TDateTime;
+
+function GPSToUTC(T: TDateTime): TDateTime;
+
+function UTCToGPS(T: TDateTime): TDateTime;
+
+interface
+
+const Leaps: array [1..18] of TDateTime ()
+
+implementation
+
+function GetLeapSecond(Date:TDate):integer;
+  var DateArray: array of TDate;
+begin
+
+
+end;
+
+function TimeFromDoy(Y : Integer; T: Word): TDateTime;
+begin
+  //
+end;
+
+function TimeFromWeekSec(T: Word): TDateTime;
+begin
+  //
+end;
+
+function GPSToUTC(T: TDateTime): TDateTime;
+begin
+   //
+end;
+
+function UTCToGPS(T: TDateTime): TDateTime;
+begin
+  //
+end;
+
+end.

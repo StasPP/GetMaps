@@ -1,0 +1,692 @@
+unit AsdbMap;
+
+interface
+
+
+uses SysUtils, Classes, ExtCtrls, Windows, Dialogs, Graphics, ComCtrls,
+     GeoFunctions, GeoFiles, GeoString, GeoClasses, JPEG, TabFunctions,
+     AsphyreDb, AsphyreTypes, PxFm, ExtDlgs, GoogleDownload,
+     Vectors2px, AsphyreBitmaps, AsphyreVampyre, SystemSurfaces, FLoader;
+
+
+  function InitAsdbContainer(var FileName: String; RewriteIfExist:boolean):boolean;
+  procedure CloseAsdbContainer;
+
+  function CropImageToFiles(Image:TImage; SaveDir, FName:string;
+                            SaveFirstOnly: Boolean): integer; /// returns the cropped images count
+
+  function CropGeoImageToFiles(Image:TImage; SaveDir, FName:string;
+                            ImgX, ImgY, X, Y :array of Double;
+                            SaveFirstOnly: Boolean): integer;
+
+  function PackAllToAsdb(isMasked: boolean; PB: TProgressBar):boolean;
+
+  function PackFilesToAsdb(ImgName, Filename, TmpDir:String; IsMasked: Boolean; PB:TProgressBar) : boolean;
+
+  procedure AddBoundsToList(ImgX, ImgY, X, Y :array of Double; SaveDir,FileName:String);
+
+  procedure AddRectToBoundsList(BLRec:TBLRect; SaveDir,FileName:String);
+
+  procedure ExportAllToOzi(OziDir, TmpDir:String);
+  
+implementation
+
+var
+    BoundList :TStringList;
+    CroppedList :TStringList;
+    OziList :TStringList;
+    TmpFilesList :TStringList;
+    Asdb : TAsdb;
+    PColor: TColor;
+
+function InitAsdbContainer(var FileName: String; RewriteIfExist:boolean):boolean;
+begin
+
+ result := false;
+
+ if Copy(FileName, Length(Filename)-4,5)<>'.asdb' then
+     FileName := FileName + '.asdb';
+
+ if (fileexists(FileName))and(ReWriteIfExist) then
+ Begin
+    CopyFile(PChar(Filename),PChar(Copy(Filename,1, Length(Filename)-5)
+             +'-backup.asdb'), false);
+    // result := false;
+    // exit;
+ End;
+
+ if Asdb=nil then
+ Asdb := TAsdb.Create();
+
+ ASDb.FileName:= FileName;
+ if (not ASDb.Update()) then
+ begin
+     result := false;
+     ShowMessage('Failed opening ASDb archive!');
+     Exit;
+ end;
+
+ result := true;
+
+end;
+
+procedure CloseAsdbContainer;
+var I:integer;
+begin
+  if Asdb<>nil then
+     Asdb.Free;
+
+  if CroppedList<>nil then
+     CroppedList.Free;
+
+  if OziList<>nil then
+     OziList.Free;
+
+  if TmpFilesList<>nil then
+  Begin
+     for I := 0 to TmpFilesList.Count - 1 do
+        DeleteFile(PChar(TmpFilesList[i]));
+
+     TmpFilesList.Free;
+  End;
+
+  if BoundList<>nil then
+  Begin
+     BoundList.Free;
+  End;
+end;
+
+function CropImageToFiles(Image:TImage; SaveDir, FName:string;
+         SaveFirstOnly: Boolean): integer; /// returns the cropped images count
+
+var X,Y, NX, NY, i,j :integer;
+  ExtendImg, CropImg, SmallImg, TinyImg: TBitMap;
+  TmpDir:String;
+begin
+
+  /// 512x512 only
+
+  if TmpFilesList = nil then
+    TmpFilesList := TStringList.Create;
+
+  if CroppedList=nil then
+    CroppedList := TStringList.Create;
+
+  if OziList=nil then
+     OziList := TStringList.Create;
+
+  result := 0;
+  if Image.Picture = nil then
+   exit;
+
+  ExtendImg:= TBitMap.Create;
+  CropImg  := TBitMap.Create;
+  SmallImg := TBitMap.Create;
+  TinyImg  := TBitMap.Create;
+
+  if SaveDir[Length(Savedir)]<>'\' then
+        SaveDir := Savedir +'\';
+
+  TmpDir := SaveDir + Fname;
+
+  if DirectoryExists(SaveDir)=false then
+          ForceDirectories(SaveDir);
+
+  ExtendImg.Assign(Image.Picture.Graphic);
+
+  X := ExtendImg.Width;
+  Y := ExtendImg.Height;
+
+  if X mod 512 <> 0 then
+     ExtendImg.Width := trunc(X/512 + 1)*512;
+
+  if Y mod 512 <> 0 then
+     ExtendImg.Height := trunc(Y/512 + 1)*512;
+
+  NX := trunc(ExtendImg.Width/512);
+  NY := trunc(ExtendImg.Height/512);
+
+  if SaveFirstOnly then
+  Begin
+    NX :=1;
+    NY :=1;
+  End;
+
+  ExtendImg.Canvas.Brush.Color := clFuchsia;
+  ExtendImg.Canvas.FillRect(Rect(X,0,ExtendImg.Width,ExtendImg.Height));
+  ExtendImg.Canvas.FillRect(Rect(0,Y,ExtendImg.Width,ExtendImg.Height));
+
+  PColor := ClFuchsia;
+
+  if (X < ExtendImg.Width)or(Y < ExtendImg.Height)
+   then
+     PColor := ExtendImg.Canvas.Pixels[ExtendImg.Width-1,ExtendImg.Height-1];
+
+  CropImg.Width  := 512;
+  CropImg.Height := 512;
+  SmallImg.Width  := 128;
+  SmallImg.Height := 128;
+  TinyImg.Width  := 32;
+  TinyImg.Height := 32;
+
+  for i := 0 to NX -1 do
+    for j := 0 to NY -1 do
+     begin
+       CropImg.Canvas.CopyRect(Rect(0,0,512,512),
+                               ExtendImg.Canvas, Rect(i*512, j*512, (i+1)*512, (j+1)*512));
+
+       CropImg.SaveToFile(TmpDir+'_'+IntToStr(i)+'_'+IntToStr(j)+'.bmp');
+
+       SetStretchBltMode(SmallImg.Canvas.Handle, HalfTone);
+
+       StretchBlt(SmallImg.Canvas.Handle, 0, 0, 128 , 128,
+               CropImg.Canvas.Handle,
+               0, 0, 512, 512, SRCCopy);
+
+       SmallImg.SaveToFile(TmpDir+'_'+IntToStr(i)+'_'+IntToStr(j)+'_s.bmp');
+
+       SetStretchBltMode(TinyImg.Canvas.Handle, HalfTone);
+
+       StretchBlt(TinyImg.Canvas.Handle, 0, 0, 32 , 32,
+               CropImg.Canvas.Handle,
+               0, 0, 512, 512, SRCCopy);
+
+       TinyImg.SaveToFile(TmpDir+'_'+IntToStr(i)+'_'+IntToStr(j)+'_t.bmp');
+
+       OziList.Add(TmpDir+'_'+IntToStr(i)+'_'+IntToStr(j));
+       
+       CroppedList.Add(TmpDir+'_'+IntToStr(i)+'_'+IntToStr(j)+'');
+       CroppedList.Add(TmpDir+'_'+IntToStr(i)+'_'+IntToStr(j)+'_s');
+       CroppedList.Add(TmpDir+'_'+IntToStr(i)+'_'+IntToStr(j)+'_t');
+       TmpFilesList.Add(TmpDir+'_'+IntToStr(i)+'_'+IntToStr(j)+'.bmp');
+       TmpFilesList.Add(TmpDir+'_'+IntToStr(i)+'_'+IntToStr(j)+'_s.bmp');
+       TmpFilesList.Add(TmpDir+'_'+IntToStr(i)+'_'+IntToStr(j)+'_t.bmp');
+
+       Inc(result);
+     end;
+
+  ExtendImg.SaveToFile(TmpDir+'_full.bmp');
+  TmpFilesList.Add(TmpDir+'_full.bmp');
+
+  ExtendImg.Destroy;
+  CropImg.Destroy;
+
+end;
+
+function CropGeoImageToFiles(Image:TImage; SaveDir, FName:string;
+                            ImgX, ImgY, X, Y :array of Double;
+                            SaveFirstOnly: Boolean): integer;
+begin
+  // ÍÅ ÃÎÒÎÂÎ. ÇÄÅÑÜ ÁÓÄÅÒ ÑÐÀÇÓ ÐÀÇÁÈÂÊÀ + ÃÐÀÍÈÖÛ ÒÀÉËÎÂ
+end;
+
+
+procedure ExportAllToOzi(OziDir, TmpDir:String);
+var BM: TBitmap;
+    ExBM :TJpegImage;
+    I, J, K : Integer;
+    B, L : Double;
+    S, s2: String;
+    Str, Str2 : TStringList;
+    DC : Char;
+begin
+  if OziDir='' then
+     exit;
+
+  if OziDir[Length(OziDir)]<>'\' then
+     OziDir:= OziDir+'\';
+
+  try
+  BM    := TBitMap.Create;
+  EXBM  := TJpegImage.Create;
+  Str   := TStringList.Create;
+  Str2  := TStringList.Create;
+  for I := 0 to OziList.Count - 1 do
+  Begin
+    
+    BM.LoadFromFile(OziList[I]+'.bmp');
+    ExBM.Assign(BM);
+    ExBM.Compress;
+    S := OziList[I];
+    J := Pos('\', S);
+    while J > 1 do
+    Begin
+       S := Copy(S, J+1, Length(S)-J);
+       J := Pos('\', S);
+    End;
+    ExBM.SaveToFile(OziDir+S+'.jpg');
+
+    Str.LoadFromFile('Data\Ozi.txt');
+    Str2.LoadFromFile(TmpDir+S+'.txt');
+
+    DC := DecimalSeparator;
+    DecimalSeparator := '.';
+
+    Str[2] := s+'.jpg';
+    for K := 0 to 3 do
+       Str[50+K] := Str[50+K] + GetCols(Str2[0],3+2*K,1,' ')
+                    + ', '+ GetCols(Str2[0],2+2*K,1,' ');
+
+    s2 := '';
+    for K := 0 to 3 do
+    Begin
+      B  := StrToFloat2(GetCols(Str2[0],2+K*2,1,' '));
+      j  := Abs(Trunc(B));
+      s2 := ' '+ IntToStr(J)+', '+ format('%.12f',[Abs(B-j)*60]);
+      if B > 0 then
+        s2 := s2 +',N,'
+          else
+             s2 := s2 +',S,';
+
+      L := StrToFloat2(GetCols(Str2[0],3+K*2,1,' '));
+      j := Abs(Trunc(L));
+      s2 := ' '+ IntToStr(J)+', '+ format('%.12f',[Abs(L-j)*60]);
+
+      if L > 0 then
+        s2 := s2 +',E,'
+          else
+             s2 := s2 +',W,';
+
+      s2:=' grid,   ,           ,           ,N' ;
+      Str[9+K] := Str[9+K] + s2;
+    End;
+
+    DecimalSeparator := DC;
+    Str.SaveToFile(OziDir+S+'.map');
+  End;
+  ExBm.Free;
+  BM.Free;
+  Str.Free;
+  Str2.Free;
+  except
+  end;
+
+end;
+
+function PackAllToAsdb(isMasked: boolean; PB: TProgressBar):boolean;
+var
+ PxFm: TPxFm;
+ pSize: TPoint;
+ Image: TSystemSurface;
+ Dest : TSystemSurface;
+ Tolerance: Integer;
+
+ MaskColor: Cardinal;
+
+ Stream: TMemoryStream;
+ FStream: TFileStream;
+
+ ImgName : String;
+ i, j, NX, NY : integer;
+ iMax : integer;
+ ImgLoaded: boolean;
+begin
+
+  if PB<>nil then
+  begin
+   PB.Visible := true;
+   PB.Position := 0;
+   PB.Repaint;
+  end;
+
+
+  if CroppedList<>nil then
+  for I := 0 to CroppedList.Count - 1 do
+  Begin
+     FloadGPS.ProgressBar1.Position := trunc(I*100/(CroppedList.Count-1));
+     FloadGPS.ProgressBar1.Repaint;
+     FLoadGPS.Label1.Hide;
+     FLoadGPS.Label2.Show;
+     FLoadGPS.MapLoad.Hide;
+     FLoadGPS.LCount.Hide;
+     FLoadGPS.Repaint;
+
+     Image:= TSystemSurface.Create();
+     ImgLoaded := BitmapManager.LoadFromFile(PChar(CroppedList[i]+'.bmp'), Image);
+
+     ImgName := CroppedList[i];
+     J := Pos('\',ImgName);
+     while J>1 do
+     Begin
+        ImgName := Copy(ImgName,J+1,Length(Imgname)-J);
+        J := Pos('\',ImgName);
+     End;
+
+     PxFm.Format:= PixelFormatToPxfm(apf_A8R8G8B8);
+     //pSize:= Point(PxFm.PatternWidth, PxFm.PatternHeight);
+
+     PxFm.TextureWidth := Image.Width;
+     PxFm.TextureHeight:= Image.Height;
+     PxFm.PatternWidth := Image.Width;
+     PxFm.PatternHeight:= Image.Height;
+
+     pSize:= Point(PxFm.PatternWidth, PxFm.PatternHeight);
+
+     PxFm.VisibleWidth := PxFm.PatternWidth;
+     PxFm.VisibleHeight:= PxFm.PatternHeight;
+
+     MaskColor:= PColor and $FFFFFF;
+     Tolerance:= 1;
+
+     if ImgLoaded=false then
+     begin
+        Continue;
+     end;
+
+     PxFm.PatternCount:= 1;//(Image.Width div pSize.X) * (Image.Height div pSize.Y);
+
+     Dest:= TSystemSurface.Create();
+
+     TileBitmap(Dest, Image, Point(PxFm.TextureWidth, PxFm.TextureHeight),
+          pSize, pSize, IsMasked, MaskColor, Tolerance);
+
+     PxFm.TextureCount:= Dest.Height div PxFm.TextureHeight;
+     Stream:= TMemoryStream.Create();
+     WriteBitmapPxFm(Stream, Dest, PxFm);
+
+     Image.Free();
+     Dest.Free();
+     Stream.Seek(0, soFromBeginning);
+
+      // write PxFm-formatted image data to ASDb
+      if (not ASDb.WriteStream(ImgName, Stream, recGraphics)) then
+      begin
+        ShowMessage('Failed writing stream to VTDb archive.');
+      end; {else ShowMessage(Edit2.Text + ' key added!');}
+
+      Stream.Free();
+
+      if PB<>nil then
+      begin
+        PB.Position := trunc(100*I/(CroppedList.Count+ BoundList.Count  - 1));
+        PB.Repaint;
+      end;
+
+  End;
+
+  if BoundList<>nil then
+  for I := 0 to BoundList.Count - 1 do
+  Begin
+     ImgName := BoundList[i];
+
+     J := Pos('\',ImgName);
+     while J>1 do
+     Begin
+        ImgName := Copy(ImgName,J+1,Length(Imgname)-J);
+        J := Pos('\',ImgName);
+     End;
+
+      FStream := TFileStream.Create(BoundList[i]+'.txt', fmOpenRead);
+      Asdb.WriteStream(ImgName+'.txt', FStream,  recFile);
+
+      Fstream.Free;
+
+     if PB<>nil then
+      begin
+        PB.Position := trunc(100*(CroppedList.Count+I)/(CroppedList.Count + BoundList.Count  - 1));
+        PB.Repaint;
+      end;
+  End;
+
+
+  if PB<>nil then
+  begin
+
+   PB.Visible := false;
+   PB.Position := 0;
+  end;
+
+end;
+
+function PackFilesToAsdb(ImgName, Filename, TmpDir:String; isMasked:Boolean; PB:TProgressBar) : boolean;
+{var
+ PxFm: TPxFm;
+ pSize: TPoint;
+ Image: TBitmap;
+ Dest: TBitmap;
+ Tolerance: Integer;
+
+ MaskColor: Cardinal;
+
+ Stream: TMemoryStream;
+ FStream: TFileStream;
+
+ i, j, NX, NY : integer;
+ iMax : integer;   }
+begin
+{ result := false;
+
+ if PB<>nil then
+  begin
+   PB.Visible := true;
+   PB.Position := 0;
+  end;
+
+ i:= 0;
+ j:= 0;
+
+ repeat
+   inc(I);
+ until not fileexists(PChar(TmpDir+'\'+ImgName+'_'+intTostr(I)+'_'+intTostr(0)+'.bmp'));
+
+
+ repeat
+   inc(j);
+ until not fileexists(PChar(TmpDir+'\'+ImgName+'_'+intTostr(0)+'_'+intTostr(j)+'.bmp'));
+
+ NX := i;
+ NY := j;
+
+ // change the following format, if necessary
+ PxFm.Format:= COLOR_A8R8G8B8;
+
+ PxFm.TextureWidth := 512;
+ PxFm.TextureHeight:= 512;
+ PxFm.PatternWidth := 512;
+ PxFm.PatternHeight:= 512;
+
+ pSize:= Point(PxFm.PatternWidth, PxFm.PatternHeight);
+
+ PxFm.VisibleWidth := PxFm.PatternWidth;
+ PxFm.VisibleHeight:= PxFm.PatternHeight;
+
+ MaskColor:= PColor and $FFFFFF;
+ Tolerance:= 1;
+
+ for i := 0 to NX-1 do
+    for j := 0 to NY-1 do
+    Begin
+      // load source bitmap
+      Image:= TBitmap.Create();
+      if (not LoadBitmap(TmpDir+'\'+ImgName+'_'+IntToStr(i)+'_'+IntToStr(j)+'.bmp', Image, ifAuto)) then
+      begin
+        ShowMessage('Failed loading source bitmap!');
+        Image.Free();
+        Continue;
+      end;
+
+      PxFm.PatternCount:= (Image.Width div pSize.X) * (Image.Height div pSize.Y);
+
+      Dest:= TBitmap.Create();
+      TileBitmap(Dest, Image, Point(PxFm.TextureWidth, PxFm.TextureHeight),
+          pSize, pSize, IsMasked, MaskColor, Tolerance);
+
+      Image.Free();
+
+      PxFm.TextureCount:= Dest.Height div PxFm.TextureHeight;
+
+      Stream:= TMemoryStream.Create();
+      WriteBitmapPxFm(Stream, Dest, PxFm);
+
+      Dest.Free();
+
+      Stream.Seek(0, soFromBeginning);
+
+      // write PxFm-formatted image data to ASDb
+      if (not ASDb.WriteStream(ImgName+'_'+IntToStr(i)+'_'+IntToStr(j), Stream, recGraphics)) then
+      begin
+        ShowMessage('Failed writing stream to VTDb archive.');
+      end;
+
+      Stream.Free();
+      if PB<>nil then
+      Begin
+        PB.Position := trunc((i*NY+j)/NX/NY*30+60);
+        PB.Repaint;
+      End;
+   end;
+
+ // ADD SMALL
+ PxFm.Format:= COLOR_A8R8G8B8;
+ PxFm.TextureWidth := 128;
+ PxFm.TextureHeight:= 128;
+ PxFm.PatternWidth := 128;
+ PxFm.PatternHeight:= 128;
+ pSize:= Point(PxFm.PatternWidth, PxFm.PatternHeight);
+ PxFm.VisibleWidth := PxFm.PatternWidth;
+ PxFm.VisibleHeight:= PxFm.PatternHeight;
+ MaskColor:= PColor and $FFFFFF;
+ Tolerance:= 1;
+ if PB<>nil then PB.repaint;
+
+ for i := 0 to NX-1 do
+    for j := 0 to NY-1 do
+    Begin
+      Image:= TBitmap.Create();
+      if (not LoadBitmap(TmpDir+'\'+ImgName+'_'+IntToStr(i)+'_'+IntToStr(j)+'_s.bmp', Image, ifAuto)) then
+      begin
+        ShowMessage('Failed loading source bitmap!');
+        Image.Free();
+        Continue;
+      end;
+
+      PxFm.PatternCount:= (Image.Width div pSize.X) * (Image.Height div pSize.Y);
+      Dest:= TBitmap.Create();
+      TileBitmap(Dest, Image, Point(PxFm.TextureWidth, PxFm.TextureHeight),
+          pSize, pSize, IsMasked, MaskColor, Tolerance);
+      Image.Free();
+      PxFm.TextureCount:= Dest.Height div PxFm.TextureHeight;
+      Stream:= TMemoryStream.Create();
+      WriteBitmapPxFm(Stream, Dest, PxFm);
+      Dest.Free();
+      Stream.Seek(0, soFromBeginning);
+
+      // write PxFm-formatted image data to ASDb
+      if (not ASDb.WriteStream(ImgName+'_'+IntToStr(i)+'_'+IntToStr(j)+'_s', Stream, recGraphics)) then
+      begin
+        ShowMessage('Failed writing stream to VTDb archive.');
+      end; {else ShowMessage(Edit2.Text + ' key added!');}    {
+
+      Stream.Free();
+
+      if PB<>nil then
+      begin
+        PB.Position := trunc((i*NY+j)/NX/NY*30);
+        PB.Repaint;
+      end;
+   end;
+
+ // ADD TINY
+ PxFm.Format:= COLOR_A8R8G8B8;
+ PxFm.TextureWidth := 32;
+ PxFm.TextureHeight:= 32;
+ PxFm.PatternWidth := 32;
+ PxFm.PatternHeight:= 32;
+ pSize:= Point(PxFm.PatternWidth, PxFm.PatternHeight);
+ PxFm.VisibleWidth := PxFm.PatternWidth;
+ PxFm.VisibleHeight:= PxFm.PatternHeight;
+ MaskColor:= PColor and $FFFFFF;
+ Tolerance:= 1;
+ if PB<>nil then
+    PB.Repaint ;
+
+ for i := 0 to NX-1 do
+    for j := 0 to NY-1 do
+    Begin
+      Image:= TBitmap.Create();
+      if (not LoadBitmap(TmpDir+'\'+ImgName+'_'+IntToStr(i)+'_'+IntToStr(j)+'_t.bmp', Image, ifAuto)) then
+      begin
+        ShowMessage('Failed loading source bitmap!');
+        Image.Free();
+        Continue;
+      end;
+
+      PxFm.PatternCount:= (Image.Width div pSize.X) * (Image.Height div pSize.Y);
+      Dest:= TBitmap.Create();
+      TileBitmap(Dest, Image, Point(PxFm.TextureWidth, PxFm.TextureHeight),
+          pSize, pSize, IsMasked, MaskColor, Tolerance);
+      Image.Free();
+      PxFm.TextureCount:= Dest.Height div PxFm.TextureHeight;
+      Stream:= TMemoryStream.Create();
+      WriteBitmapPxFm(Stream, Dest, PxFm);
+      Dest.Free();
+      Stream.Seek(0, soFromBeginning);
+
+      // write PxFm-formatted image data to ASDb
+      if (not ASDb.WriteStream(ImgName+'_'+IntToStr(i)+'_'+IntToStr(j)+'_t', Stream, recGraphics)) then
+      begin
+        ShowMessage('Failed writing stream to VTDb archive.');
+      end; {else ShowMessage(Edit2.Text + ' key added!');}{
+
+      Stream.Free();
+
+      if PB<>nil then
+      begin
+        PB.Position := trunc((i*NY+j)/NX/NY*10+90);
+        PB.Repaint;
+      end;
+   end;
+
+
+ FStream := TFileStream.Create(Tmpdir+'\'+ImgName+'.txt', fmOpenRead);
+ Asdb.WriteStream(ImgName+'.txt', FStream,  recFile);
+
+ Fstream.Free;
+ //Asdb.Free;
+ //Asdb.Destroy;
+  if PB<>nil then
+  begin
+   PB.Visible := false;
+   PB.Position := 0;
+  end;
+
+// ShowMessage('???? ASDB ???????? ???????!');   }
+end;
+
+procedure AddBoundsToList(ImgX, ImgY, X, Y :array of Double; SaveDir,FileName:String);
+begin
+ //
+end;
+
+procedure AddRectToBoundsList(BLRec:TBLRect; SaveDir,FileName:String);
+var S :TStringList;
+    I :Integer;
+begin
+   if BoundList=nil then
+      BoundList:= TStringList.Create;
+
+    S := TStringList.Create;
+    S.Add('0 0');
+    {for I := 1 to 4 do
+      S[S.Count-1]:= S[S.Count-1]+ ' '+  FloatTostr(BLRec.B[I])+' '
+                        + FloatTostr(BLRec.L[I]);  }
+
+    S[S.Count-1]:= S[S.Count-1]+ ' '+  FloatTostr(BLRec.B[1])+' '
+                        + FloatTostr(BLRec.L[1]);
+    S[S.Count-1]:= S[S.Count-1]+ ' '+  FloatTostr(BLRec.B[2])+' '
+                        + FloatTostr(BLRec.L[2]);
+    S[S.Count-1]:= S[S.Count-1]+ ' '+  FloatTostr(BLRec.B[4])+' '
+                        + FloatTostr(BLRec.L[4]);
+    S[S.Count-1]:= S[S.Count-1]+ ' '+  FloatTostr(BLRec.B[3])+' '
+                        + FloatTostr(BLRec.L[3]);
+   
+    if SaveDir[Length(Savedir)]<>'\' then
+        SaveDir := Savedir +'\';
+
+    S.SaveToFile(SaveDir+Filename+'.txt');
+    S.Destroy;
+    TmpFilesList.Add(SaveDir+Filename+'.txt');
+    BoundList.Add(SaveDir+Filename);
+end;
+
+end.

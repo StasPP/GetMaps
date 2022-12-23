@@ -1,0 +1,28 @@
+unit FLoader;
+
+interface
+
+uses
+  Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
+  Dialogs, ComCtrls, StdCtrls, ExtCtrls;
+
+type
+   TFLoadGPS = class(TForm)
+    ProgressBar1: TProgressBar;
+    Panel1: TPanel;
+    MapLoad: TLabel;
+    LCount: TLabel;
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  FLoadGPS: TFLoadGPS;
+
+implementation
+
+{$R *.dfm}
+
+end.

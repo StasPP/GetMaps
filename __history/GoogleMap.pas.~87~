@@ -1,0 +1,684 @@
+unit GoogleMap;
+
+interface
+
+uses AsdbMap, MapFunctions, GoogleDownload, GeoFunctions, TabFunctions,
+     AbstractCanvas, AbstractDevices, AsphyreImages, AsphyreTypes, Dialogs,
+     Graphics, Jpeg, ExtCtrls, SysUtils, FLoader, BasicMapObjects, RTypes,
+     DrawFunctions;
+
+type
+  TGoogleCell = Record
+    x, y, Gx, Gy :array [1..4] of Double;
+    Gcenter :TLatLong; /// Center
+    Zoom    :integer;
+    BLRect  :TBLRect;
+  end;
+
+  procedure AddGoogle(B, L :Double);
+  procedure DoMultiAddGoogle;
+
+  procedure ReComputeGoogle(WFZ: Boolean);
+  procedure ResetGoogle;
+  procedure InitGoogle(B,L: Double);
+  function AlreadyHasGoogle(B, L: Double):integer;
+  function SearchGoogle(SearchB, SearchL: Double; Zoom:Integer;
+           var FoundB, FoundL: Double):boolean;
+  function GetGoogleCursor(B,L : Double):boolean;
+  procedure DrawGoogleCursor(AsphCanvas:TAsphyreCanvas; AsphImages: TAsphyreImages);
+  procedure DrawGoogle(AsphCanvas:TAsphyreCanvas; AsphImages: TAsphyreImages);
+
+  procedure DownloadSelected;
+
+  procedure GoogleZoomUp;
+  procedure GoogleZoomDown;
+
+const
+  GoogleMapStyles : Array [0..3] of string = ('roadmap','satellite',
+                                               'hybrid','terrain');
+
+var
+  GoogleCells  :array of TGoogleCell;
+  GoogleCount  :integer = 0;
+  GoogleInitBL :TLatLong;
+  GoogleCursor :TLatLong;
+  ZoomA        :integer = 10;
+  GoogleKey    :string = '';
+  GoogleStyle  :string ='satellite';
+  ChoosedCell  :integer;
+  GoogleTmpDir :String;
+  GoogleOZIDir :String;
+
+  GoogleMultiAddBegin, GoogleMultiAddEnd : TLatLong;
+  GoogleMultiAddMode :Boolean;
+  GoogleMultiAdd     :Boolean;
+
+  FoundList :array of TLatLong;
+implementation
+
+procedure ResetGoogle;
+begin
+  GoogleInitBL.lat  := 0;
+  GoogleInitBL.long := 0;
+  GoogleCursor.lat  := 0;
+  GoogleCursor.long := 0;
+  GoogleCount := 0;
+end;
+
+procedure InitGoogle(B,L: Double);
+begin
+  GoogleInitBL.lat  := B;
+  GoogleInitBL.long := L;
+  GoogleCursor.lat  := B;
+  GoogleCursor.long := L;
+end;
+
+//////
+
+function AlreadyHasGoogle(B, L: Double):integer;
+var
+ i:integer;
+ mapC : TMyPoint;
+begin
+  result := -1;
+  MapC := BLtoMap(B, L, UTM, South, MyZone);
+  for I := 0 to GoogleCount - 1 do
+    if GoogleCells[I].Zoom = ZoomA then
+     if PointInBox(GoogleCells[I].x, GoogleCells[I].y, MapC.x, MapC.y) then
+        result := I;
+
+end;
+
+function SearchGoogle(SearchB, SearchL: Double; Zoom:Integer;
+   var FoundB, FoundL: Double):boolean;
+
+  function PointInGeoBox(BL: TBLRect; B, L: Double): boolean;
+  begin
+     result :=  IsPIn_Vector(BL.B[1], BL.L[1], BL.B[3], BL.L[3],
+       BL.B[4], BL.L[4],  B, L)
+       or IsPIn_Vector(BL.B[4], BL.L[4], BL.B[2], BL.L[2],
+       BL.B[1], BL.L[1],  B, L);
+  end;
+
+const
+  maxiter = 10000;
+var
+  found: boolean;
+  iter : integer;
+  BLR, BLA, BLB : TBLRect;
+  BA, LA, BB, LB : Double;
+
+begin
+  found := false;
+  iter  := 0;
+  repeat
+    BLR := GetBLBounds(FoundB, FoundL, Zoom);
+    found := PointInGeoBox(BLR, SearchB, SearchL);
+
+    if not found then
+    Begin
+        if FoundB < SearchB then
+        GetNextBLUp (FoundB, FoundL, Zoom, BA, LA)
+           else
+              if FoundB > SearchB then
+                GetNextBLDown (FoundB, FoundL, Zoom, BA, LA);
+                //  else
+                //    BLA := BLR;
+
+        BLA := GetBLBounds(BA, LA, Zoom);
+
+        found := PointInGeoBox(BLA, SearchB, SearchL);
+        if found then
+        begin
+           FoundB := BA;
+           FoundL := LA;
+        end;
+    End;
+
+    if not found then
+    Begin
+        if FoundL < SearchL then
+        GetNextBLRight (FoundB, FoundL, Zoom, BB, LB)
+           else
+             if FoundL > SearchL then
+              GetNextBLLeft (FoundB, FoundL, Zoom, BB, LB) ;
+               //  else
+                 //   BLA := BLR;
+
+        BLB := GetBLBounds(BB, LB, Zoom);
+
+        found := PointInGeoBox(BLB, SearchB, SearchL);
+        if found then
+        begin
+           FoundB := BB;
+           FoundL := LB;
+        end;
+    End;
+
+    if not found then
+    Begin
+      FoundB := BA;
+      FoundL := LB;
+    End;
+
+    inc(iter);
+  until (found) or (iter >= maxiter);
+  Result := found;
+end;
+
+function GetGoogleCursor(B, L : Double):boolean;
+begin
+  Result := SearchGoogle( B, L, ZoomA, GoogleCursor.lat, GoogleCursor.long );
+end;
+
+procedure AddGoogle(B, L: Double);
+var I :integer;
+    BLR : TBLRect;
+begin
+   // if not GetGoogleCursor( B, L) then
+   //   exit;
+    ChoosedCell :=-1;
+    if not GoogleMultiAdd then
+      ChoosedCell := AlreadyHasGoogle(GoogleCursor.lat, GoogleCursor.long);
+
+    if ChoosedCell<>-1 then
+    Begin
+      GoogleCells[ChoosedCell]:= GoogleCells[GoogleCount-1];
+      Dec(GoogleCount);
+      SetLength(Googlecells,GoogleCount);
+      exit;
+    End;
+
+   if not GoogleMultiAdd then
+    for I := 0 to GoogleCount - 1 do
+    if (Abs(GoogleCursor.lat - GoogleCells[i].Gcenter.lat)
+          < (GoogleCells[I].BLRect.B[1] - GoogleCells[I].BLRect.B[4])/2) and
+       (Abs(GoogleCursor.long - GoogleCells[i].Gcenter.long) <
+          (GoogleCells[I].BLRect.L[4] - GoogleCells[I].BLRect.L[1])/2) and
+       (ZoomA = GoogleCells[i].Zoom) then
+      exit;
+
+    BLR := GetBLBounds(B, L, ZoomA);
+
+    inc(GoogleCount);
+    Setlength(GoogleCells, GoogleCount);
+
+    GoogleCells[length(GoogleCells)-1].BLRect := BLR;
+
+    GoogleCells[length(GoogleCells)-1].Gcenter.Lat  := B;
+    GoogleCells[length(GoogleCells)-1].Gcenter.Long := L;
+
+    GoogleCells[length(GoogleCells)-1].Gx[1] :=  BLR.B[1];
+    GoogleCells[length(GoogleCells)-1].Gy[1] :=  BLR.L[1];
+    GoogleCells[length(GoogleCells)-1].Gx[2] :=  BLR.B[2];
+    GoogleCells[length(GoogleCells)-1].Gy[2] :=  BLR.L[2];
+    GoogleCells[length(GoogleCells)-1].Gx[3] :=  BLR.B[4];
+    GoogleCells[length(GoogleCells)-1].Gy[3] :=  BLR.L[4];
+    GoogleCells[length(GoogleCells)-1].Gx[4] :=  BLR.B[3];
+    GoogleCells[length(GoogleCells)-1].Gy[4] :=  BLR.L[3];
+
+    GoogleCells[length(GoogleCells)-1].Zoom := ZoomA;
+
+    if length(GoogleCells)=1 then
+    Begin
+      GoogleInitBL.lat  := B;
+      GoogleInitBL.long := L;
+      GoogleCursor := GoogleInitBL;
+    End;
+
+    RecomputeGoogle(false);
+end;
+
+procedure ReComputeGoogle(WFZ: Boolean);
+var i,j :integer;
+    xx, yy:Double;
+begin
+   WaitForZone := WFZ;
+
+   for I := 0 to Length(GoogleCells)- 1 do
+      for j := 1 to 4 do
+      Begin
+         if UTM then
+            GeoToUTM(WGS,GoogleCells[i].Gx[j],GoogleCells[i].Gy[j],South, yy,xx, Myzone, WaitForZone)
+               else
+                   WGSToSK(GoogleCells[i].Gx[j],GoogleCells[i].Gy[j],0, xx,yy, MyZone, WaitForZone);
+
+         GoogleCells[i].x[j] := xx;
+         GoogleCells[i].y[j] := yy;
+         WaitForZone := false;
+      End;
+end;
+
+procedure GetFoundList;
+var Lb, Le, Bb, Be : Double;
+
+function inBox(BL :TBLRect):boolean;
+begin
+   result := (BL.L[4] > Lb) and (BL.B[1] >  Bb)
+         and (BL.L[1] < Le) and (BL.B[4] <  Be);
+end;
+
+var   I :integer;
+      cB, cL : Double;
+      startB, startL, endB, endL : Double;
+      BLR :TBLRect;
+begin
+     //GetGoogleCursor(GoogleCursor.lat, GoogleCursor.long);
+
+     SetLength(FoundList,0);
+
+     Bb := GoogleMultiAddBegin.lat;
+     Be := GoogleMultiAddEnd.lat;
+     Lb := GoogleMultiAddBegin.long;
+     Le := GoogleMultiAddEnd.long;
+
+     if GoogleMultiAddBegin.lat > GoogleMultiAddEnd.lat then
+     Begin
+       Bb := GoogleMultiAddEnd.lat;
+       Be := GoogleMultiAddBegin.lat;
+     End;
+
+     if GoogleMultiAddBegin.long > GoogleMultiAddEnd.long then
+     Begin
+       Lb := GoogleMultiAddEnd.long;
+       Le := GoogleMultiAddBegin.long;
+     End;
+
+     //GoogleCursor := GoogleInitBL;
+     StartB := GoogleInitBL.lat; StartL := GoogleInitBL.long;
+     //GoogleCursor.long;
+     SearchGoogle(Bb, Lb, ZoomA, StartB, StartL);
+   //  Bb := StartB; Lb := StartL;
+
+
+     //// ασττεπ
+     cB := StartB;
+     cL := StartL;
+     SearchGoogle(cB, cL, ZoomA, cB, cL);
+
+     BLR := GetBLBounds(cB, cL, ZoomA);
+
+     {startB := Bb - (BLR.B[1] - BLR.B[4])*(ZoomA-4);
+     startL := Lb - (BLR.L[4] - BLR.L[1])*(ZoomA-6); }
+     endB := Be + abs(BLR.B[1] - BLR.B[4])*(ZoomA-4);
+     endL := Le + abs(BLR.L[4] - BLR.L[1])*(ZoomA-6);
+
+     for I := 1 to (ZoomA-6) do
+       GetNextBLDown(cB, cL, ZoomA, cB, cL);
+     for I := 1 to (ZoomA-4) do
+       GetNextBLLeft(cB, cL, ZoomA, cB, cL);
+     startB := cB;
+     StartL := cL;
+     //// 1-ÿ ÿχεικΰ
+
+     cB := startB;
+     cL := startL;
+     SearchGoogle(cB, cL, ZoomA, cB, cL);         
+
+      repeat
+
+       repeat
+         GetNextBLRight(cB, cL, ZoomA, cB, cL);
+         BLR := GetBLBounds(cB, cL, ZoomA);
+         if inBox(BLR) then
+         Begin
+           SetLength(FoundList,Length(FoundList)+1);
+
+           FoundList[Length(FoundList)-1].Lat := cB;
+           FoundList[Length(FoundList)-1].Long := cL;
+         End;
+       until BLR.L[4] > endL;
+
+       cL := startL;
+       SearchGoogle(cB, cL, ZoomA, cB, cL);
+       GetNextBLUp(cB, cL, ZoomA, cB, cL);
+
+      until BLR.B[1] > endB;
+
+     GoogleCursor := GoogleInitBL;
+end;
+
+procedure DrawGoogleCursor(AsphCanvas:TAsphyreCanvas; AsphImages: TAsphyreImages);
+var
+  i, j, imgN: integer;
+  _C, C : Array[1..4] of TMyPoint;
+  BLR : TBLRect;
+  L, xmin, ymin, xmax, ymax: Double;
+
+  Col: TColor4;
+
+  FStart, FEnd: TMyPoint;
+begin
+
+   if GoogleMultiAdd then
+   BEGIN
+
+
+
+      GetFoundList;
+      Col :=  cRGB4(255,255,255,100);
+      ImgN := AsphImages.IndexOf('addcell.image');
+      if GoogleMultiAddMode then
+      for I := 0 to Length(FoundList) - 1 do
+      Begin
+        BLR := GetBLBounds(FoundList[I].lat, FoundList[I].long, ZoomA);
+        for j := 1 to 4 do
+        Begin
+           _C[j] := BLToMap(BLR.B[j], BLR.L[j], UTM, South, MyZone);
+           _C[j] := MapToScreen(_C[j].x ,_C[j].y);
+        End;
+
+
+
+        AsphCanvas.UseImagePx(AsphImages.Items[ImgN], pxBounds4(0, 0, 256, 256));
+
+        AsphCanvas.TexMap(Point4( _C[1].x, _C[1].y,  _C[2].x, _C[2].y,
+                                  _C[4].x, _C[4].y,  _C[3].x, _C[3].y), col);
+
+      End;
+
+      if GoogleMultiAddMode then
+         Col :=  cRGB4(0,255,0,100)
+          else
+            Col :=  cRGB4(255,0,0,100);
+
+      _C[1] := BLToScreen(GoogleMultiAddBegin.lat,GoogleMultiAddBegin.long);
+      _C[2] := BLToScreen(GoogleMultiAddEnd.lat,GoogleMultiAddEnd.long);
+      DrawZone(AsphCanvas, _C[1].x, _C[1].y, _C[1].x, _C[2].y, _C[2].x,
+                           _C[2].Y, _C[2].x, _C[1].Y, Col);
+
+
+   END
+    ELSE
+    BEGIN
+
+      ChoosedCell := AlreadyHasGoogle(GoogleCursor.lat, GoogleCursor.long);
+
+      BLR := GetBLBounds(GoogleCursor.lat, GoogleCursor.long, ZoomA);
+      for j := 1 to 4 do
+      Begin
+          _C[j] := BLToMap(BLR.B[j], BLR.L[j], UTM, South, MyZone);
+          _C[j] := MapToScreen(_C[j].x ,_C[j].y);
+      End;
+
+       try
+          L := sqrt(sqr(_C[4].x - _C[1].x) + sqr(_C[4].y - _C[1].y));
+       except
+         exit
+       end;
+
+       xmin := _C[1].x;
+       ymin := _C[1].y;
+       xmax := _C[1].x;
+       ymax := _C[1].y;
+
+       for j := 2 to 4 do
+       begin
+         if _C[j].x < xmin then
+           xmin := _C[j].x;
+         if _C[j].y < ymin then
+           ymin := _C[j].y;
+
+         if _C[j].x > xmax then
+           xmax := _C[j].x;
+         if _C[j].y > ymax then
+           ymax := _C[j].y;
+       end;
+
+       if (xmax<0)and(xmin<0) or (xmax > DispSize.X)and(xmin > DispSize.X) then
+           exit;
+
+       if (ymax<0)and(ymin<0) or (ymax > DispSize.Y)and(ymin > DispSize.Y) then
+           exit;
+
+       
+       Col := clWhite4;
+       if ChoosedCell<>-1 then
+          ImgN := AsphImages.IndexOf('delcell.image')
+          else
+          begin
+            ImgN := AsphImages.IndexOf('addcell.image');
+            Col :=  cRGB4(255,255,255,100);
+          end;
+
+       AsphCanvas.UseImagePx(AsphImages.Items[ImgN], pxBounds4(0, 0, 256, 256));
+
+       AsphCanvas.TexMap(Point4( _C[1].x, _C[1].y,  _C[2].x, _C[2].y,
+                                 _C[4].x, _C[4].y,  _C[3].x, _C[3].y), Col);
+
+  END;
+
+end;
+
+procedure DrawGoogle(AsphCanvas:TAsphyreCanvas; AsphImages: TAsphyreImages);
+var I, J, ImgN :Integer;
+    L, xmin, ymin, xmax, ymax : Double;
+    _C : Array[1..4] of TMyPoint;
+    Col : TColor4;
+    FStart, FEnd : TMyPoint;
+    isCut : boolean;
+begin
+
+  if GoogleCount=0 then
+     exit;
+
+  if (GoogleMultiAdd)and(GoogleMultiAddMode=false) then
+  Begin
+    FStart := BLtoMap(GoogleMultiAddBegin.Lat, GoogleMultiAddBegin.Long);
+    FEnd := BLtoMap(GoogleMultiAddEnd.Lat, GoogleMultiAddEnd.Long);
+  End;
+
+  for I := 0 to Length(GoogleCells) - 1 do
+    Begin
+       if I = ChoosedCell then
+          continue;
+          
+       for j := 1 to 4 do
+       Begin
+          _C[j] := MapToScreen(GoogleCells[i].x[j],GoogleCells[i].y[j]);
+       End;
+
+       try
+          L := sqrt(sqr(_C[4].x - _C[1].x) + sqr(_C[4].y - _C[1].y));
+       except
+         continue;
+       end;
+
+       {if (L < 5 * MinMap) then
+         continue;
+
+       if (L > 5 * MaxMap) then
+         continue;}
+
+       xmin := _C[1].x;
+       ymin := _C[1].y;
+       xmax := _C[1].x;
+       ymax := _C[1].y;
+       for j := 2 to 4 do
+       begin
+         if _C[j].x < xmin then
+           xmin := _C[j].x;
+         if _C[j].y < ymin then
+           ymin := _C[j].y;
+
+         if _C[j].x > xmax then
+           xmax := _C[j].x;
+         if _C[j].y > ymax then
+           ymax := _C[j].y;
+       end;
+
+       if (xmax<0)and(xmin<0) or (xmax > DispSize.X)and(xmin > DispSize.X) then
+           continue;
+
+       if (ymax<0)and(ymin<0) or (ymax > DispSize.Y)and(ymin > DispSize.Y) then
+           continue;
+
+       if (GoogleMultiAdd)and(GoogleMultiAddMode=false)and(GoogleCells[I].Zoom=ZoomA) then
+         isCut := BoxInBox(GoogleCells[I].x, GoogleCells[I].y, FStart.x, FStart.y,
+                  FEnd.x, FEnd.y)
+           else
+             isCut := false;
+
+       if isCut then
+          ImgN := AsphImages.IndexOf('delcell.image')
+          else
+            ImgN := AsphImages.IndexOf('okcell.image');
+
+       AsphCanvas.UseImagePx(AsphImages.Items[ImgN], pxBounds4(0, 0, 256, 256));
+
+       if ZoomA = GoogleCells[i].Zoom then
+         Col := clWhite4
+              else
+                Col := cRGB4(255,255,255,100);
+
+       AsphCanvas.TexMap(Point4( _C[1].x, _C[1].y,  _C[2].x, _C[2].y,
+                                 _C[3].x, _C[3].y,  _C[4].x, _C[4].y),Col);
+
+   End;
+
+end;
+
+
+procedure DownloadSelected;
+
+  function GetNameByTime:string;
+  var  D, M, Y, h, mi, s, msc: word;
+  begin
+      DecodeDate(now,y, m, d);
+      DecodeTime(now,h, mi, s, msc);
+      result := 'Google_'+IntTostr(y)+'-'+IntTostr(m)+'-'+IntTostr(d)+
+           '_'+IntTostr(h)+'-'+ IntTostr(m) +'_';
+  end;
+
+var
+  Url : string;
+
+  SaveD: TSaveDialog;
+  ImageMap :TImage;
+
+  I, j, k :Integer;
+
+  ImgNames, FN : String;
+
+  SortedGoogle: Array of TGoogleCell;
+begin
+  if GoogleCount = 0 then
+    exit;
+
+  ImageMap := TImage.Create(nil);
+  SaveD := TSaveDialog.Create(nil);
+
+  ImgNames := GetNameByTime;
+
+  SetLength(SortedGoogle,GoogleCount);
+  K := 0;
+  for I := 0 to GoogleCount - 1 do
+     for J := 6 to 18 do
+      if GoogleCells[i].Zoom = J then
+        begin
+          SortedGoogle[k] := GoogleCells[i];
+          inc(K);
+        end;
+
+
+  if SaveD.Execute then
+  Begin
+       FLoadGPS.Show;
+       FN := SaveD.Filename;
+       FLoadGPS.LCount.Visible  := true;
+       FLoadGPS.Label1.Show;
+       FLoadGPS.Label2.Hide;
+       FLoadGPS.MapLoad.Hide;
+       FLoadGPS.LCount.Caption  := IntToStr(0) + ' / ' + IntToStr(GoogleCount);
+       FloadGPS.ProgressBar1.Position := 0;
+       FLoadGPS.Repaint;
+
+    for I := 0 to GoogleCount - 1 do
+    Begin
+      Url := GetGoogleStaticMapURL(SortedGoogle[I].Gcenter.Lat,
+             SortedGoogle[I].Gcenter.Long, GoogleStyle, GoogleKey,
+             SortedGoogle[I].Zoom);
+
+      GetGoogleStaticMap(URL, ImageMap);
+
+      CropImageToFiles(ImageMap, GoogleTmpDir, ImgNames+IntTostr(I), True);
+      AddRectToBoundsList(SortedGoogle[I].BLRect, GoogleTmpDir, ImgNames+IntTostr(I));
+
+      FLoadGPS.LCount.Caption  := IntToStr(I) + ' / ' + IntToStr(GoogleCount);
+      FloadGPS.ProgressBar1.Position := trunc(I*100/(GoogleCount-1));
+      FloadGPS.Repaint;
+    End;
+
+       if InitAsdbContainer(FN, true) then
+       begin
+         PackAllToAsdb(true, nil);
+         ExportAllToOzi(GoogleOZIDir, GoogleTmpDir);
+         ResetGoogle;
+         LoadMaps(FN, GoogleTmpDir, AsphMapImages);
+       end;
+  End;
+
+  FloadGPS.Hide;
+
+
+  SaveD.Free;
+  ImageMap.Free;
+end;
+
+procedure GoogleZoomUp;
+begin
+   if Zooma < 16 then
+    begin
+      inc(Zooma);
+      inc(Zooma);
+      GoogleCursor := GoogleInitBL;
+      GetGoogleCursor(CanvCursorBL.lat,CanvCursorBL.long);
+    end;
+end;
+
+procedure GoogleZoomDown;
+begin
+  if Zooma > 8 then
+    Begin
+      dec(Zooma);
+      dec(Zooma);
+      GoogleCursor := GoogleInitBL;
+      GetGoogleCursor(CanvCursorBL.lat,CanvCursorBL.long);
+    End;
+end;
+
+procedure DoMultiAddGoogle;
+var I:integer;
+     Bi, Li : Double;
+     FStart, FEnd : TMyPoint;
+begin
+
+  FStart := BLtoMap(GoogleMultiAddBegin.Lat, GoogleMultiAddBegin.Long);
+  FEnd := BLtoMap(GoogleMultiAddEnd.Lat, GoogleMultiAddEnd.Long);
+
+  for I := GoogleCount - 1 Downto 0 do
+    if GoogleCells[I].Zoom = ZoomA then
+      if BoxInBox(GoogleCells[I].x, GoogleCells[I].y, FStart.x, FStart.y,
+                  FEnd.x, FEnd.y) then
+      Begin
+        GoogleCells[I] := GoogleCells[GoogleCount-1];
+        dec(GoogleCount);
+      End;
+
+      SetLength(GoogleCells,GoogleCount);
+
+
+   if GoogleMultiAddMode then
+   Begin
+      GetFoundList;
+      for i := 0 to Length(FoundList) - 1 do
+        AddGoogle(FoundList[I].lat, FoundList[I].long);
+
+   End;
+
+
+   GoogleMultiAdd := false;
+
+end;
+
+end.

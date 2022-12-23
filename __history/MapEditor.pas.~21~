@@ -1,0 +1,146 @@
+unit MapEditor;
+
+interface
+
+uses MapFunctions, GeoFunctions, TabFunctions, Vectors2, Windows,
+     AbstractCanvas, AbstractDevices, AsphyreImages, AsphyreTypes, AsphyreDb,
+     Classes, FLoader, SysUtils, GeoClasses, GeoString, Dialogs, DrawFunctions,
+     BasicMapObjects, RTypes;
+
+
+ ///// MapEditor
+  procedure GetMapsUnderPoint(B,L: Double);
+  procedure MapInfoHUD;
+  procedure DeleteMap(N:Integer);
+
+  procedure SaveToAsdb(FileName: String; NewFileName:String);
+//  procedure MapUp(I:Integer);
+//  pocedure MapDown(I:Integer);
+
+
+ //// RouteEditor
+
+ /// ...
+
+  var
+
+  ChoosedMaps:array of Integer;
+  ChoosedMapsInfo:array of String;
+  WaitForChoose : boolean;
+
+
+implementation
+
+procedure GetMapsUnderPoint(B,L: Double);
+
+  function GetW(M:TMap):integer;
+  begin
+    Result := Trunc( abs(M.x[4] - M.x[1])+abs(M.y[4]-M.y[1]) / Scale);
+  end;
+
+  var
+    I:Integer;
+    P :TMyPoint;
+begin
+  MapChoosed := -1;
+  SetLength(ChoosedMaps,0);
+
+  P := BLToMap(B, L);
+  for I := 0 to Length(MapList) - 1 do
+  Begin
+    if MapPointInBox(MapList[i].x, MapList[i].y,P.x,P.y)  then
+        Begin
+          SetLength(ChoosedMaps,Length(ChoosedMaps)+1);
+
+          if Length(ChoosedMaps)= 1 then
+             MapChoosed := I
+              else
+                 MapChoosed := -1;
+
+          ChoosedMaps[Length(ChoosedMaps)-1] := i;
+
+          SetLength(ChoosedMapsInfo,Length(ChoosedMaps));
+          ChoosedMapsInfo[Length(ChoosedMaps)-1] := MapList[I].imgName +
+                ' ('+ InttoStr(GetW(MapList[I])) +' px)';
+
+        End;
+
+  End;
+end;
+
+procedure MapInfoHUD;
+begin
+
+end;
+
+procedure DeleteMap(N:Integer);
+var I:Integer;
+begin
+  for I := N to Length(MapList) - 2 do
+    MapList[i] := MapList[i+1];
+    
+  SetLength(MapList,Length(MapList)-1);  
+end;
+
+procedure SaveToAsdb(FileName: String; NewFileName:String);
+var
+  OldAsdb :TAsdb;
+  I, J, K :Integer;
+  Found   :Boolean;
+  DelList :array of String;
+begin
+
+  if Copy(FileName, Length(Filename)-4,5)<>'.asdb' then
+       FileName := FileName + '.asdb';
+
+  if (fileexists(NewFileName)) then
+  Begin
+      CopyFile(PChar(NewFilename),PChar(Copy(NewFilename,1, Length(NewFilename)-5)
+             +'-backup.asdb'), false);
+
+     if FileName <> NewFileName then
+        DeleteFile(PChar(NewFilename));
+  End;
+
+  if FileName = NewFileName then
+     CopyFile(PChar(Filename),PChar(Copy(Filename,1, Length(Filename)-5)
+             +'-backup.asdb'), false)
+      else
+         CopyFile(PChar(Filename),PChar(NewFilename), false);
+
+
+  OldASDb:= TASDb.Create();
+  OldASDb.FileName:= NewFileName;
+  OldASDb.OpenMode:= opReadOnly;
+  OldAsdb.Update;
+
+  for J := OldAsdb.RecordCount - 1 downto 0 do
+  Begin
+      Found := false;
+      if OldAsdb.RecordType[J] = recGraphics then
+      Begin
+          for K := 0 to Length(MapList) - 1 do
+             if (OldAsdb.RecordKey[J] = MapList[K].imgName) or
+                (OldAsdb.RecordKey[J] = MapList[K].imgName+'_s') or
+                (OldAsdb.RecordKey[J] = MapLIst[K].imgName+'_t') then
+                begin
+                   Found := true;
+                   break;
+                end;
+                  if not Found then
+           Begin
+             SetLength(DelList, Length(DelList)+1);
+             DelList[Length(DelList)-1] := OldAsdb.RecordKey[J];
+           End;
+      End;
+   End;
+
+   for I := 0 to Length(DelList) - 1 do
+     OldAsdb.RemoveRecord(DelList[I]);
+
+//   OldAsdb.Update;
+   OldAsdb.Destroy;
+
+end;
+
+end.

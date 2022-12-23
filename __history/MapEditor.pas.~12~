@@ -1,0 +1,281 @@
+unit MapEditor;
+
+interface
+
+uses MapFunctions, GeoFunctions, TabFunctions, Vectors2, Windows,
+     AbstractCanvas, AbstractDevices, AsphyreImages, AsphyreTypes, AsphyreDb,
+     Classes, FLoader, SysUtils, GeoClasses, GeoString, Dialogs, DrawFunctions,
+     BasicMapObjects, RTypes;
+
+
+ ///// MapEditor
+  procedure GetMapsUnderPoint(B,L: Double);
+  procedure MapInfoHUD;
+  procedure DeleteMap(N:Integer);
+
+  procedure SaveToAsdb(FileName: String; TmpDir:String);
+//  procedure MapUp(I:Integer);
+//  pocedure MapDown(I:Integer);
+
+
+ //// RouteEditor
+
+ /// ...
+
+  var
+
+  ChoosedMaps:array of Integer;
+  ChoosedMapsInfo:array of String;
+  WaitForChoose : boolean;
+
+
+implementation
+
+procedure GetMapsUnderPoint(B,L: Double);
+
+  function GetW(M:TMap):integer;
+  begin
+    Result := Trunc( abs(M.x[4] - M.x[1])+abs(M.y[4]-M.y[1]) / Scale);
+  end;
+
+  var
+    I:Integer;
+    P :TMyPoint;
+begin
+  MapChoosed := -1;
+  SetLength(ChoosedMaps,0);
+
+  P := BLToMap(B, L);
+  for I := 0 to Length(MapList) - 1 do
+  Begin
+    if MapPointInBox(MapList[i].x, MapList[i].y,P.x,P.y)  then
+        Begin
+          SetLength(ChoosedMaps,Length(ChoosedMaps)+1);
+
+          if Length(ChoosedMaps)= 1 then
+             MapChoosed := I
+              else
+                 MapChoosed := -1;
+
+          ChoosedMaps[Length(ChoosedMaps)-1] := i;
+
+          SetLength(ChoosedMapsInfo,Length(ChoosedMaps));
+          ChoosedMapsInfo[Length(ChoosedMaps)-1] := MapList[I].imgName +
+                ' ('+ InttoStr(GetW(MapList[I])) +' px)';
+
+        End;
+
+  End;
+end;
+
+procedure MapInfoHUD;
+begin
+
+end;
+
+procedure DeleteMap(N:Integer);
+var I:Integer;
+begin
+  for I := N to Length(MapList) - 2 do
+    MapList[i] := MapList[i+1];
+    
+  SetLength(MapList,Length(MapList)-1);  
+end;
+
+procedure SaveToAsdb(FileName: String; TmpDir:String);
+var
+  MyAsdb  :TAsdb;
+  OldAsdb :TAsdb;
+
+  function InitMyAsdb(var FileName: String):boolean;
+  begin
+    result := false;
+
+    if Copy(FileName, Length(Filename)-4,5)<>'.asdb' then
+       FileName := FileName + '.asdb';
+
+    if (fileexists(FileName)) then
+    Begin
+      CopyFile(PChar(Filename),PChar(Copy(Filename,1, Length(Filename)-5)
+             +' -backup.asdb'), true);
+      DeleteFile(PChar(Filename));
+    End;
+      MyAsdb := TAsdb.Create();
+
+     MyASDb.FileName:= FileName;
+     if (not MyASDb.Update()) then
+     begin
+        result := false;
+        ShowMessage('Failed opening ASDb archive!');
+        Exit;
+     end;
+
+     result := true;
+   end;
+var
+ {PxFm: TPxFm;
+ pSize: TPoint;
+ Image: TSystemSurface;
+ Dest : TSystemSurface;
+ Tolerance: Integer;
+
+ MaskColor: Cardinal;
+
+ Stream: TMemoryStream;
+ FStream: TFileStream;
+
+ ImgName : String;
+ i, j, NX, NY : integer;
+ iMax : integer;
+ ImgLoaded: boolean;  }
+ I : Integer;
+begin
+  InitMyAsdb(FileName);
+
+  if not DirectoryExists(TmpDir) then
+     ForceDirectories(TmpDir);
+
+  for I := 0 to Length(MapAsdbList) - 1 do
+  Begin
+     MapASDb:= TASDb.Create();
+     MapASDb.FileName:= FileName;
+     MapASDb.OpenMode:= opReadOnly;
+
+     MapAsdb.Update;
+
+
+
+
+  End;
+
+
+  MyAsdb.
+
+  for I := 0 to Length(MapList) - 1 do
+   AsphMapImages.
+
+ // MyAsdb.WriteRecord()
+  AsphMapImages.Items[I]
+  ///  MapList[I].imgN
+
+
+  MyAsdb.Destroy;
+
+
+  {if PB<>nil then
+  begin
+   PB.Visible := true;
+   PB.Position := 0;
+   PB.Repaint;
+  end;
+
+
+  if CroppedList<>nil then
+  for I := 0 to CroppedList.Count - 1 do
+  Begin
+     FloadGPS.ProgressBar1.Position := trunc(I*100/(CroppedList.Count-1));
+     FloadGPS.ProgressBar1.Repaint;
+     FLoadGPS.Label1.Hide;
+     FLoadGPS.Label2.Show;
+     FLoadGPS.MapLoad.Hide;
+     FLoadGPS.LCount.Hide;
+     FLoadGPS.Repaint;
+
+     Image:= TSystemSurface.Create();
+     ImgLoaded := BitmapManager.LoadFromFile(PChar(CroppedList[i]+'.bmp'), Image);
+
+     ImgName := CroppedList[i];
+     J := Pos('\',ImgName);
+     while J>1 do
+     Begin
+        ImgName := Copy(ImgName,J+1,Length(Imgname)-J);
+        J := Pos('\',ImgName);
+     End;
+
+     PxFm.Format:= PixelFormatToPxfm(apf_A8R8G8B8);
+     //pSize:= Point(PxFm.PatternWidth, PxFm.PatternHeight);
+
+     PxFm.TextureWidth := Image.Width;
+     PxFm.TextureHeight:= Image.Height;
+     PxFm.PatternWidth := Image.Width;
+     PxFm.PatternHeight:= Image.Height;
+
+     pSize:= Point(PxFm.PatternWidth, PxFm.PatternHeight);
+
+     PxFm.VisibleWidth := PxFm.PatternWidth;
+     PxFm.VisibleHeight:= PxFm.PatternHeight;
+
+     MaskColor:= PColor and $FFFFFF;
+     Tolerance:= 1;
+
+     if ImgLoaded=false then
+     begin
+        Continue;
+     end;
+
+     PxFm.PatternCount:= 1;//(Image.Width div pSize.X) * (Image.Height div pSize.Y);
+
+     Dest:= TSystemSurface.Create();
+
+     TileBitmap(Dest, Image, Point(PxFm.TextureWidth, PxFm.TextureHeight),
+          pSize, pSize, IsMasked, MaskColor, Tolerance);
+
+     PxFm.TextureCount:= Dest.Height div PxFm.TextureHeight;
+     Stream:= TMemoryStream.Create();
+     WriteBitmapPxFm(Stream, Dest, PxFm);
+
+     Image.Free();
+     Dest.Free();
+     Stream.Seek(0, soFromBeginning);
+
+      // write PxFm-formatted image data to ASDb
+      if (not ASDb.WriteStream(ImgName, Stream, recGraphics)) then
+      begin
+        ShowMessage('Failed writing stream to VTDb archive.');
+      end; {else ShowMessage(Edit2.Text + ' key added!');}
+
+     { Stream.Free();
+
+      if PB<>nil then
+      begin
+        PB.Position := trunc(100*I/(CroppedList.Count+ BoundList.Count  - 1));
+        PB.Repaint;
+      end;
+
+  End;
+
+  if BoundList<>nil then
+  for I := 0 to BoundList.Count - 1 do
+  Begin
+     ImgName := BoundList[i];
+
+     J := Pos('\',ImgName);
+     while J>1 do
+     Begin
+        ImgName := Copy(ImgName,J+1,Length(Imgname)-J);
+        J := Pos('\',ImgName);
+     End;
+
+      FStream := TFileStream.Create(BoundList[i]+'.txt', fmOpenRead);
+      Asdb.WriteStream(ImgName+'.txt', FStream,  recFile);
+
+      Fstream.Free;
+
+     if PB<>nil then
+      begin
+        PB.Position := trunc(100*(CroppedList.Count+I)/(CroppedList.Count + BoundList.Count  - 1));
+        PB.Repaint;
+      end;
+  End;
+
+
+  if PB<>nil then
+  begin
+
+   PB.Visible := false;
+   PB.Position := 0;
+  end;   }
+
+end;
+
+end.

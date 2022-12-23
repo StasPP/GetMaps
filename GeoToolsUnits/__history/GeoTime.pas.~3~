@@ -1,0 +1,122 @@
+unit GeoTime;
+
+interface
+
+uses DateUtils, SysUtils, Classes, TabFunctions;
+
+function GetLeapSecond(FileName:String; Date:TDateTime):integer;
+
+function TimeFromDoy(Y : Integer; T: Word): TDateTime;
+
+function TimeFromWeekSec(T: Word): TDateTime;
+
+function GPSToUTC(T: TDateTime): TDateTime;
+
+function UTCToGPS(T: TDateTime): TDateTime;
+
+const Leaps: array [1..18] of TDateTime = ( 29767.9999999884, 30132.9999999884,
+                                          30497.9999999884, 31228.9999999884,
+                                          32142.9999999884, 32873.9999999884,
+                                          33238.9999999884, 33785.9999999884,
+                                          34150.9999999884, 34515.9999999884,
+                                          35064.9999999884, 35611.9999999884,
+                                          35976.9999999884, 38533.9999999884,
+                                          39629.9999999884, 41090.9999999884,
+                                          42185.9999999884, 42551.9999999884);
+
+implementation
+
+function GetLeapSecond(FileName:String; Date:TDateTime):integer;
+  var DateArray: array of TDateTime;
+
+
+  function GetSep(str: string): string;
+  const
+    n = 6;
+    seps: array [1..n] of string = (':','/','\','-','.',',');
+  var i:integer;
+  begin
+     Result:='';
+       for i:=1 to n do
+       if Pos(seps[i],str)>1 then
+       begin
+         Result:=seps[i];
+         break;
+       end;
+  end;
+
+  procedure GetLeapDatesFromFile;
+  const TimeFText = 'hh:mm:ss.zzz';
+        DateFText = 'YYYY-MM-DD';
+  var I: integer;
+      T:TDateTime;
+      FormatSettings: TFormatSettings;
+      S: TStringList;
+  begin
+     S := TStringList.Create;
+     FormatSettings.ShortDateFormat := DateFText + ' ' + TimeFText;
+     FormatSettings.LongTimeFormat  := FormatSettings.ShortDateFormat;
+
+     FormatSettings.DateSeparator := GetSep(DateFText)[1];
+     FormatSettings.TimeSeparator := GetSep(TimeFText)[1];
+
+     if Pos(',',TimeF.Text) > 1 then
+      FormatSettings.DecimalSeparator := ','
+         else
+           FormatSettings.DecimalSeparator := '.';
+
+     try
+       SetLength(DateArray,0);
+
+       S.LoadFromFile(OpenDialog1.FileName);
+
+       for I := 0 To  S.Count - 1 Do
+       begin
+          T := StrToDateTime(S[I], FormatSettings);
+          SetLength(DateArray,Length(DateArray)+1);
+          DateArray[Length(DateArray)-1] := T;
+       end;
+
+     except
+       SetLength(DateArray,Length(leaps));
+       DateArray := Leaps;
+     end;
+
+
+
+  end;
+
+
+var I:Integer;
+begin
+   if Fileexists(FileName) then
+      GetLeapDatesFromFile
+       else
+       begin
+         SetLength(DateArray,Length(leaps));
+         DateArray := Leaps;
+       end;
+
+end;
+
+function TimeFromDoy(Y : Integer; T: Word): TDateTime;
+begin
+  //
+end;
+
+function TimeFromWeekSec(T: Word): TDateTime;
+begin
+  //
+end;
+
+function GPSToUTC(T: TDateTime): TDateTime;
+begin
+   //
+end;
+
+function UTCToGPS(T: TDateTime): TDateTime;
+begin
+  //
+end;
+
+end.

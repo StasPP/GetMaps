@@ -1,0 +1,74 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ProjectGuid>{f2cd94f9-bc06-48be-8730-7e0750039d99}</ProjectGuid>
+    <MainSource>GetMap.dpr</MainSource>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <DCC_DCCCompiler>DCC32</DCC_DCCCompiler>
+    <DCC_DependencyCheckOutputName>GetMap.exe</DCC_DependencyCheckOutputName>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <Version>7.0</Version>
+    <DCC_DebugInformation>False</DCC_DebugInformation>
+    <DCC_LocalDebugSymbols>False</DCC_LocalDebugSymbols>
+    <DCC_SymbolReferenceInfo>0</DCC_SymbolReferenceInfo>
+    <DCC_UnitSearchPath>GeoToolsUnits;Units\GraphicEx;Units\OldAsph;Units\OldAsph\Common</DCC_UnitSearchPath>
+    <DCC_ResourcePath>GeoToolsUnits;Units\GraphicEx;Units\OldAsph;Units\OldAsph\Common</DCC_ResourcePath>
+    <DCC_ObjPath>GeoToolsUnits;Units\GraphicEx;Units\OldAsph;Units\OldAsph\Common</DCC_ObjPath>
+    <DCC_IncludePath>GeoToolsUnits;Units\GraphicEx;Units\OldAsph;Units\OldAsph\Common</DCC_IncludePath>
+    <DCC_Define>RELEASE</DCC_Define>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <Version>7.0</Version>
+    <DCC_UnitSearchPath>GeoToolsUnits;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Extras\Extensions;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Extras\Extensions\LibTiff;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Source\Extensions;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Source\JpegLib;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Source\ZLib;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Source;..\..\AsphyreSphinx110\Source;..\Raster\Raster\Units\GraphicEx</DCC_UnitSearchPath>
+    <DCC_ResourcePath>GeoToolsUnits;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Extras\Extensions;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Extras\Extensions\LibTiff;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Source\Extensions;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Source\JpegLib;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Source\ZLib;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Source;..\..\AsphyreSphinx110\Source;..\Raster\Raster\Units\GraphicEx</DCC_ResourcePath>
+    <DCC_ObjPath>GeoToolsUnits;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Extras\Extensions;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Extras\Extensions\LibTiff;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Source\Extensions;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Source\JpegLib;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Source\ZLib;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Source;..\..\AsphyreSphinx110\Source;..\Raster\Raster\Units\GraphicEx</DCC_ObjPath>
+    <DCC_IncludePath>GeoToolsUnits;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Extras\Extensions;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Extras\Extensions\LibTiff;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Source\Extensions;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Source\JpegLib;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Source\ZLib;..\..\AsphyreSphinx110\Vampyre0264\Vampyre\Source;..\..\AsphyreSphinx110\Source;..\Raster\Raster\Units\GraphicEx</DCC_IncludePath>
+    <DCC_Define>DEBUG</DCC_Define>
+  </PropertyGroup>
+  <ProjectExtensions>
+    <Borland.Personality>Delphi.Personality</Borland.Personality>
+    <Borland.ProjectType>VCLApplication</Borland.ProjectType>
+    <BorlandProject>
+<BorlandProject><Delphi.Personality><Parameters><Parameters Name="UseLauncher">False</Parameters><Parameters Name="LoadAllSymbols">True</Parameters><Parameters Name="LoadUnspecifiedSymbols">False</Parameters></Parameters><VersionInfo><VersionInfo Name="IncludeVerInfo">False</VersionInfo><VersionInfo Name="AutoIncBuild">False</VersionInfo><VersionInfo Name="MajorVer">1</VersionInfo><VersionInfo Name="MinorVer">0</VersionInfo><VersionInfo Name="Release">0</VersionInfo><VersionInfo Name="Build">0</VersionInfo><VersionInfo Name="Debug">False</VersionInfo><VersionInfo Name="PreRelease">False</VersionInfo><VersionInfo Name="Special">False</VersionInfo><VersionInfo Name="Private">False</VersionInfo><VersionInfo Name="DLL">False</VersionInfo><VersionInfo Name="Locale">1049</VersionInfo><VersionInfo Name="CodePage">1251</VersionInfo></VersionInfo><VersionInfoKeys><VersionInfoKeys Name="CompanyName"></VersionInfoKeys><VersionInfoKeys Name="FileDescription"></VersionInfoKeys><VersionInfoKeys Name="FileVersion">1.0.0.0</VersionInfoKeys><VersionInfoKeys Name="InternalName"></VersionInfoKeys><VersionInfoKeys Name="LegalCopyright"></VersionInfoKeys><VersionInfoKeys Name="LegalTrademarks"></VersionInfoKeys><VersionInfoKeys Name="OriginalFilename"></VersionInfoKeys><VersionInfoKeys Name="ProductName"></VersionInfoKeys><VersionInfoKeys Name="ProductVersion">1.0.0.0</VersionInfoKeys><VersionInfoKeys Name="Comments"></VersionInfoKeys></VersionInfoKeys><Source><Source Name="MainSource">GetMap.dpr</Source></Source></Delphi.Personality><ModelSupport>True</ModelSupport></BorlandProject></BorlandProject>
+  </ProjectExtensions>
+  <Import Project="$(MSBuildBinPath)\Borland.Delphi.Targets" />
+  <ItemGroup>
+    <DelphiCompile Include="GetMap.dpr">
+      <MainSource>MainSource</MainSource>
+    </DelphiCompile>
+    <DCCReference Include="BasicMapObjects.pas" />
+    <DCCReference Include="CoordSysFm.pas">
+      <Form>CSForm</Form>
+    </DCCReference>
+    <DCCReference Include="DrawFunctions.pas" />
+    <DCCReference Include="FLoader.pas">
+      <Form>FLoadGPS</Form>
+    </DCCReference>
+    <DCCReference Include="GeoCalcUnit.pas">
+      <Form>GeoCalcFm</Form>
+    </DCCReference>
+    <DCCReference Include="Google\GetGoogle.pas">
+      <Form>WForm</Form>
+    </DCCReference>
+    <DCCReference Include="HintFm.pas">
+      <Form>HintForm</Form>
+    </DCCReference>
+    <DCCReference Include="HUD1.pas" />
+    <DCCReference Include="LangLoader.pas" />
+    <DCCReference Include="LoadData.pas">
+      <Form>LoadRData</Form>
+    </DCCReference>
+    <DCCReference Include="MapEditor.pas" />
+    <DCCReference Include="MapFunctions.pas" />
+    <DCCReference Include="MapperFm.pas">
+      <Form>MapFm</Form>
+    </DCCReference>
+    <DCCReference Include="TabFunctions.pas" />
+    <DCCReference Include="UGetMapPos.pas">
+      <Form>GetMapPos</Form>
+    </DCCReference>
+    <None Include="ModelSupport_GetMap\default.txaPackage" />
+  </ItemGroup>
+</Project>

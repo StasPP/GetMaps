@@ -1,0 +1,26 @@
+program GetMap;
+
+uses
+  Forms,
+  MapperFm in 'MapperFm.pas' {MapFm},
+  GetGoogle in 'Google\GetGoogle.pas' {WForm},
+  FLoader in 'FLoader.pas' {FLoadGPS},
+  TabFunctions in 'TabFunctions.pas',
+  LoadData in 'LoadData.pas' {LoadRData},
+  GeoCalcUnit in 'GeoCalcUnit.pas' {GeoCalcFm},
+  GoogleMap in 'GoogleMap.pas',
+  MapFunctions in 'MapFunctions.pas',
+  DrawFunctions in 'DrawFunctions.pas',
+  BasicMapObjects in 'BasicMapObjects.pas';
+
+{$R *.res}
+
+begin
+  Application.Initialize;
+  Application.CreateForm(TWForm, WForm);
+  Application.CreateForm(TMapFm, MapFm);
+  Application.CreateForm(TFLoadGPS, FLoadGPS);
+  Application.CreateForm(TLoadRData, LoadRData);
+  Application.CreateForm(TGeoCalcFm, GeoCalcFm);
+  Application.Run;
+end.

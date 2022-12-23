@@ -1,0 +1,1902 @@
+unit GeoFunctions;
+
+//// Шевчук С. 2016
+
+interface
+
+uses GeoClasses, GeoMath, Math;
+
+  function Geo1ToGeo2(B1, L1, H1 : double; InputSKNumber,
+                      OutputSKNumber :Integer; var B2, L2, H2 : double):string;
+  function Geo1ForceToGeo2(B1, L1, H1 : double; InputSKNumber, OutputSKNumber :Integer;
+                            var B2, L2, H2 : double):string;
+
+  procedure GeoToECEF(DatumN: Integer; B, L, H: double; var OutputX, OutputY, OutputZ : double);
+  procedure ECEFToGeo(DatumN: Integer; X, Y, Z: double; var OutputB, OutputL, OutputH : double);
+
+  procedure GaussKrugerToGeo(DatumN:Integer; x, y: double; Zone :Integer; var OutputB, OutputL: double);  overload;
+
+  procedure GaussKrugerToGeo(DatumN:Integer; x, y: double; var OutputB, OutputL: double);  overload;
+
+  procedure GaussKrugerToGeo(DatumN: Integer; x, y: double; var OutputB, OutputL : double;
+                            Lat0, Long0, FN, FE, m :Double);    overload;
+
+  procedure GeoToGaussKruger(DatumN: Integer; B1, L1 : double; var Outputx, Outputy: double;
+                             var Zone: integer; AutoZone: boolean); overload;
+
+  procedure GeoToGaussKruger(DatumN: Integer; B1, L1 : double; var Outputx, Outputy: double;
+                            Lat0, Long0, FN, FE, m :Double); overload;
+
+
+  procedure GeoToGaussKruger_Kras(B1, L1 : double; var Outputx, Outputy: double;
+                             var Zone: integer; AutoZone: boolean); overload;
+
+  procedure GeoToGaussKruger_Kras(B1, L1 : double; var Outputx, Outputy: double;
+                            Lat0, Long0, FN, FE, m :Double); overload;
+
+  procedure GaussKrugerToGeo_Kras(x, y: double; var OutputB, OutputL : double);  overload;
+  procedure GaussKrugerToGeo_Kras(x, y: double; var OutputB, OutputL : double;
+                            Lat0, Long0, FN, FE, m :Double);  overload;
+
+  procedure GeoToUTM(DatumN: Integer; B, L: double; South: Boolean;
+                      var OutputNorthing, OutputEasting: double;
+                      var Zone: integer; AutoZone: boolean);    overload;
+  procedure GeoToUTM(DatumN: Integer; B, L: double; South: Boolean;
+                      var OutputNorthing, OutputEasting: double;
+                      Lat0, Long0, FN, FE, ms :Double);    overload;
+  procedure UTMToGeo(DatumN: Integer; Northing, Easting: double; South: Boolean;
+                      var OutputB, OutputL: double);   overload;
+  procedure UTMToGeo(DatumN: Integer; Northing, Easting: double; South: Boolean;
+                      Zone: integer; var OutputB, OutputL: double);   overload;
+  procedure UTMToGeo(DatumN: Integer; Northing, Easting: double; South: Boolean;
+                      var OutputB, OutputL: double;
+                      Lat0, Long0, FN, FE, m :Double);   overload;
+  procedure PVMtoUTM (DatumN: Integer; B, L: double; var Northing,Easting: double);
+  procedure UTMToPVM(DatumN: Integer; Northing,Easting: double; var OutputB, OutputL: double);
+
+
+  procedure CoordinateSystemToDatum(CSN: integer; X, Y, H: Double; var OutputB, OutputL, OutputH: Double);
+  procedure DatumToCoordinateSystem(CSN: integer; B, L, H: Double; var OutputX, OutputY, OutputH: Double);
+
+  {function GetGeoidDeltaH(x,y :Double; Geoid:TGeoid): Double;
+  function GetGeoidalH(x, y, Hell :Double; Geoid:TGeoid);
+  function GetEllipsoidalH(x, y, Hgeo :Double; Geoid:TGeoid);  }
+
+
+  const
+       SuccessStr = ' Перевод успешно выполнен!';
+  var
+       ShortestConv : array of integer;
+       ShortIn, ShortOut : integer;
+
+implementation
+
+
+
+////////////////////////// TRANSFORMATIONS   /////////////////////////////////////////////////////////////////////////
+
+procedure GeoToECEF(DatumN: Integer; B, L, H: double;
+                    var OutputX, OutputY, OutputZ : double);
+var N, e2, a : Double;
+    _Datum: TDatum;
+
+ procedure GetConsts;
+ var al : Double;
+ begin
+   a := _Datum.Ellipsoid.a;
+   al := _Datum.Ellipsoid.alpha;
+
+   e2  := 2 * al - al*al;
+ end;
+
+begin
+  try
+   _Datum :=  DatumList[DatumN];
+  except
+    OutputX := 0;
+    OutputY := 0;
+    OutputZ := 0;
+    exit;
+  end;
+
+  GetConsts;
+  
+  B := B * pi / 180;
+  L := L * pi / 180;
+
+  N := a/sqrt(1-e2*sin(B)*sin(B));
+
+  OutputX := (N+H)*cos(B)*cos(L);
+  OutputY := (N+H)*cos(B)*sin(L);
+  OutputZ := ((1-e2)*N+H)*sin(B);
+end;
+
+procedure ECEFToGeo(DatumN: Integer; X, Y, Z: double;
+                    var OutputB, OutputL, OutputH : double);
+var La, e2, a, D, r, p, c, s1, s2, _d, b : Double;
+    _Datum: TDatum;
+
+ procedure GetConsts;
+ var al : Double;
+ begin
+   a := _Datum.Ellipsoid.a;
+   al := _Datum.Ellipsoid.alpha;
+
+   e2  := 2 * al - al*al;
+ end;
+
+begin
+  try
+   _Datum :=  DatumList[DatumN];
+  except
+    OutputB := 0;
+    OutputL := 0;
+    OutputH := 0;
+    exit;
+  end;
+
+  GetConsts;
+
+  D := sqrt(sqr(X)+sqr(Y));
+  if D = 0 then
+  begin
+     OutputB := 0.5*pi*Z/abs(Z);
+     OutputL := 0;
+     OutputH := Z * Sin(OutputB) - a * sqrt(1-e2*sin(OutputB)*sin(OutputB));
+  end
+   else
+   begin
+     La := abs(arcsin(Y/D));
+
+     if (Y < 0) and (X > 0) then OutputL := 2*pi - La;
+     if (Y < 0) and (X < 0) then OutputL := pi + La;
+     if (Y > 0) and (X < 0) then OutputL := pi - La;
+     if (Y > 0) and (X > 0) then OutputL := La;
+     if (Y = 0) and (X < 0) then OutputL := 0;
+     if (Y = 0) and (X > 0) then OutputL := pi;
+   end;
+
+   if Z = 0 then
+   begin
+      OutputB := 0;
+      OutputH := D - a;
+   end
+    else
+    begin
+       r := sqrt(sqr(X)+sqr(Y)+sqr(Z));
+       c := arcsin(Z/r);
+       p := (e2 * a) / (2 * r);
+
+       s1 := 0;
+
+       repeat
+         b:= c + s1;
+         s2 := p*sin(2*b) / sqrt(1-e2*sin(b)*sin(b)) ;
+         s2 := arcsin( s2 );
+         _d := abs(s2 - s1);
+         s1 := s2;
+       until _d < 0.0001/ro;
+        OutputB := b;
+        OutputH := D*cos(B) + Z*sin(B) - a*sqrt(1-e2*sin(B)*sin(B));
+    end;
+    OutputB := OutputB / pi *180;
+    OutputL := OutputL / pi *180;
+
+end;
+
+///////////////////////////// GAUSS-KRUGER FOR ANY ELLIPSOID (even for GSK-2011)
+
+procedure GaussKrugerToGeo(DatumN:Integer; x, y: double; var OutputB, OutputL: double);    overload;
+begin
+ GaussKrugerToGeo(DatumN,x, y, 0, OutputB, OutputL);
+end;
+
+procedure GaussKrugerToGeo(DatumN:Integer; x, y: double; Zone :Integer; var OutputB, OutputL: double);    overload;
+var
+
+ e2, _a, _al, Zo, Bo : Double;
+ Long0 : Double;
+ _Datum : TDatum;
+ FE : Integer;
+
+const
+   Linit = 0;
+   ZoneW = 6;
+   FN = 0;
+
+  procedure GetConsts;
+  begin
+     _a := _Datum.Ellipsoid.a;
+     _al := _Datum.Ellipsoid.alpha;
+
+     e2  := 2 * _al - _al*_al;
+  end;
+
+  procedure GetZone;
+  begin
+     if Zone = 0 then
+        Zone := trunc(Y / 1000000)
+         else
+         Begin
+           if Zone > 0 then
+             if Y < 1000000  then
+               Y := Y + Zone*1000000;
+         End;
+
+     FE := 500000 + Zone*1000000;
+     Long0 := (ZoneW*Zone - ZoneW/2);
+  end;
+
+  function XToB(X,Y:double):Double ;
+  var
+    A0, A2, A4, A6, beta, ao, p1, p2, p3, q2, q4, q6, A2y2, A4y4, A6y6, A8y8 : Double;
+    k: array [1..15] of Double;
+  begin
+
+    A0 := 1 + 3*e2/4 + 45*e2*e2/64 + 175*e2*e2*e2/256 + 11025*e2*e2*e2*e2/16384;
+    A2 := 3*e2/4 + 15*e2*e2/16 + 525*e2*e2*e2/512 + 2205*e2*e2*e2*e2/2048;
+    A4 := 15*e2*e2/64 + 105*e2*e2*e2/256 + 2205*e2*e2*e2*e2/4096;
+    A6 := 35*e2*e2*e2/512 + 315*e2*e2*e2*e2/2048;
+
+    ao := _a*(1 - e2)*A0;
+    beta := x/ao;
+
+    q2 :=  A2/(2*A0) + ( A2*A4/Pow(A0, 2) )/8 - ( Pow(A2, 3)/Pow(A0, 3) )/16;
+    q4 := -A4/(4*A0) + Pow(A2, 2) / ( 4*Pow(A0, 2) );
+    q6 :=  A6/(6*A0) - 3*A2*A4/(8*Pow(A0, 2)) +  3*Pow(A2, 3) / ( 16*Pow(A0, 3) ) ;
+
+    p1 := q2 + 2*q4 + 3*q6;
+    p2 := 4*q4 + 16*q6;
+    p3 := 16*q6;
+
+    Bo := beta + sin(2*beta)*( p1 - p2 *Pow(sin(beta), 2) + p3*Pow(sin(beta), 4) );
+
+    Zo := y / (_a*cos(Bo));
+
+    k[1] := 1 / (4*(1 - e2));
+    k[2] := e2/ (2*(1 - e2));
+    k[3] := e2*e2 / (4*(1 - e2));
+
+    k[4] := (5 + 6*e2 + 3*e2*e2) / 48;
+    k[5] := (1 + 14*e2 + 15*e2*e2) / 24;
+    k[6] := (8*e2 + 31*e2*e2) / 24;
+    k[7] := 2*e2*e2/3;
+
+    k[8] := (61 + 107*e2) / 1440;
+    k[9] := (16 + 333*e2) / 720;
+    k[10]:= ( 2 +  87*e2) / 180;
+    k[11]:= (17*e2) / 90;
+
+    k[12]:= (277 - 1108*e2)/ 16128;
+    k[13]:= ( 29 - 116*e2) / 4480;
+    k[14]:= ( 41 - 164*e2) / 3360;
+    k[15]:= ( 17 - 68*e2)  / 5040;
+
+    A2y2 := -Pow(Zo, 2)* Sin(2*Bo) *(k[1] - k[2]*Pow(sin(Bo),2) + k[3]*Pow(sin(Bo),4) );
+    A4y4 :=  Pow(Zo, 4)* Sin(2*Bo) *(k[4] - k[5]*Pow(sin(Bo),2) + k[6]*Pow(sin(Bo),4) - k[7]*Pow(sin(Bo),6) );
+    A6y6 := -Pow(Zo, 6)* Sin(2*Bo) *(k[8] - k[9]*Pow(sin(Bo),2) + k[10]*Pow(sin(Bo),4)- k[11]*Pow(sin(Bo),6));
+    A8y8 :=  Pow(Zo, 8)* Sin(2*Bo) *(k[12]- k[13]*Pow(sin(Bo),2)+ k[14]*Pow(sin(Bo),4)- k[15]*Pow(sin(Bo),6) );
+
+    Result := Bo + A2y2 + A4y4 + A6y6 + A8y8;
+  end;
+
+  function YToL(X,Y:double):Double ;
+  var
+     B1y1, B3y3, B5y5, B7y7, B9y9 : Double;
+     n : array [1..19] of Double;
+  begin
+
+     n[1]  := 0.5*e2;
+     n[2]  := e2*e2/8;
+     n[3]  := e2*e2*e2/16;
+
+     n[4]  := 1/(6*(1 - e2));
+     n[5]  := (2 - 9*e2)/(12*(1 - e2));
+     n[6]  := (4*e2 - 39*e2*e2)/(48*(1 - e2));
+     n[7]  := (3*e2*e2)/(16*(1 - e2));
+
+     n[8]  := (5 + 6*e2 + 3*e2*e2)/120;
+     n[9]  := (192 - 240*e2 - 123*e2*e2)/1280;
+     n[10] := (32 - 1376*e2 + 609*e2*e2)/3840;
+     n[11] :=  (e2 - 69*e2*e2)/240;
+
+     n[12] := ( 61 + 46*e2  )/(5040*(1 - e2));
+     n[13] := (958 - 1361*e2)/(10080*(1 - e2));
+     n[14] := (358 - 4395*e2)/(10080*(1 - e2));
+     n[15] := ( -2 + 815*e2 )/(10080*(1 - e2));
+
+     n[16] := 0.0038;
+     n[17] := 0.0524;
+
+     n[18] := (18270 - 113789*e2)/362880;
+     n[19] := (1636  -  72123*e2)/362880;
+
+     B1y1 :=          Zo * (   1 - n[1]*Pow(sin(Bo),2) - n[2]*Pow(sin(Bo),4)  - n[3]*Pow(sin(Bo),6)  );
+     B3y3 := -Pow(Zo, 3) * (n[4] + n[5]*Pow(sin(Bo),2) - n[6]*Pow(sin(Bo),4)  - n[7]*Pow(sin(Bo),6)  );
+     B5y5 :=  Pow(Zo, 5) * (n[8] + n[9]*Pow(sin(Bo),2) + n[10]*Pow(sin(Bo),4) - n[11]*Pow(sin(Bo),6) );
+     B7y7 := -Pow(Zo, 7) * (n[12]+ n[13]*Pow(sin(Bo),2)+ n[14]*Pow(sin(Bo),4) - n[15]*Pow(sin(Bo),6) );
+     B9y9 :=  Pow(Zo, 9) * (n[16]+ n[17]*Pow(sin(Bo),2)+ n[18]*Pow(sin(Bo),4) + n[19]*Pow(sin(Bo),6) );
+
+     Result := B1y1 + B3y3 + B5y5 + B7y7 + B9y9;
+  end;
+
+begin
+
+  try
+    _Datum :=  DatumList[DatumN];
+  except
+    OutputB := 0;
+    OutputL := 0;
+    exit;
+  end;
+
+  GetConsts;
+  GetZone;
+
+  /// Костыль
+   if  _Datum.Ellipsoid.Name = 'Krasowsky' then
+   begin
+      GaussKrugerToGeo_Kras(x, y, OutputB, OutputL);
+      exit;
+   end;
+
+  OutputB := XToB(x - FN,y - FE)*180/pi;
+  OutputL := Long0 + YToL(x- FN,y - FE)*180/pi;
+end;
+
+
+procedure GaussKrugerToGeo(DatumN: Integer; x, y: double; var OutputB, OutputL : double;
+                            Lat0, Long0, FN, FE, m :Double);    overload;
+
+var
+ e2, e_2, _a, _al, Zo, Bo : Double;
+ _Datum : TDatum;
+
+
+  procedure GetConsts;
+  begin
+     _a := _Datum.Ellipsoid.a;
+     _al := _Datum.Ellipsoid.alpha;
+
+     e2  := 2 * _al - _al*_al;
+     e_2 := e2 / (1 - e2);
+  end;
+
+  function XToB(X,Y:double):Double ;
+  var
+    A0, A2, A4, A6, beta, ao, p1, p2, p3, q2, q4, q6, A2y2, A4y4, A6y6, A8y8 : Double;
+    k: array [1..15] of Double;
+  begin
+
+    A0 := 1 + 3*e2/4 + 45*e2*e2/64 + 175*e2*e2*e2/256 + 11025*e2*e2*e2*e2/16384;
+    A2 := 3*e2/4 + 15*e2*e2/16 + 525*e2*e2*e2/512 + 2205*e2*e2*e2*e2/2048;
+    A4 := 15*e2*e2/64 + 105*e2*e2*e2/256 + 2205*e2*e2*e2*e2/4096;
+    A6 := 35*e2*e2*e2/512 + 315*e2*e2*e2*e2/2048;
+
+    ao := _a*(1 - e2)*A0;
+    beta := x/ao;
+
+    q2 := 0.5*A2/A0 + ( A2*A4/Pow(A0, 2) )/8 - ( Pow(A2, 3)/Pow(A0, 3) )/16;
+    q4 := -A4/(4*A0) + Pow(A2, 2)/(4*Pow(A0, 2));
+    q6 := A6/(6*A0) - 3*A2*A4/(8*Pow(A0, 2)) + ( 3* Pow(A2, 3)/(16*Pow(A0, 3)) );
+
+    p1 := q2 + 2*q4 + 3*q6;
+    p2 := 4*q4 + 16*q6;
+    p3 := 16*q6;
+
+    Bo := beta + sin(2*beta)*( p1 - p2 *Pow(sin(beta), 2) + p3*Pow(sin(beta), 4) );
+
+    Zo := y / (_a*cos(Bo));
+
+    k[1] := 1 / (4*(1 - e2));
+    k[2] := e2/ (2*(1 - e2));
+    k[3] := e2*e2 / (4*(1 - e2));
+
+    k[4] := (5 + 6*e2 + 3*e2*e2) / 48;
+    k[5] := (1 + 14*e2 + 15*e2*e2) / 24;
+    k[6] := (8*e2 + 31*e2*e2) / 24;
+    k[7] := 2*e2*e2/3;
+
+    k[8] := (61 + 107*e2) / 1440;
+    k[9] := (16 + 333*e2) / 720;
+    k[10]:= ( 2 +  87*e2) / 180;
+    k[11]:= (17*e2) / 90;
+
+    k[12]:= (277 - 1108*e2)/ 16128;
+    k[13]:= ( 29 - 116*e2) / 4480;
+    k[14]:= ( 41 - 164*e2) / 3360;
+    k[15]:= ( 17 - 68*e2)  / 5040;
+
+    A2y2 := -Pow(Zo, 2)* Sin(2*Bo) *(k[1] - k[2]*Pow(sin(Bo),2) + k[3]*Pow(sin(Bo),4) );
+    A4y4 :=  Pow(Zo, 4)* Sin(2*Bo) *(k[4] - k[5]*Pow(sin(Bo),2) + k[6]*Pow(sin(Bo),4) - k[7]*Pow(sin(Bo),6) );
+    A6y6 := -Pow(Zo, 4)* Sin(2*Bo) *(k[8] - k[9]*Pow(sin(Bo),2) + k[10]*Pow(sin(Bo),4)- k[11]*Pow(sin(Bo),6));
+    A8y8 :=  Pow(Zo, 4)* Sin(2*Bo) *(k[12]- k[13]*Pow(sin(Bo),2)+ k[14]*Pow(sin(Bo),4)- k[15]*Pow(sin(Bo),6) );
+
+    Result := Bo + A2y2 + A4y4 + A6y6 + A8y8;
+  end;
+
+  function YToL(X,Y:double):Double ;
+  var
+     B1y1, B3y3, B5y5, B7y7, B9y9 : Double;
+     n : array [1..19] of Double;
+  begin
+
+     n[1]  := 0.5*e2;
+     n[2]  := e2*e2/8;
+     n[3]  := e2*e2*e2/16;
+
+     n[4]  := 1/(6*(1 - e2));
+     n[5]  := (2 - 9*e2)/(12*(1 - e2));
+     n[6]  := (4*e2 - 39*e2*e2)/(48*(1 - e2));
+     n[7]  := (3*e2*e2)/(16*(1 - e2));
+
+     n[8]  := (5 + 6*e2 + 3*e2*e2)/120;
+     n[9]  := (192 - 240*e2 - 123*e2*e2)/1280;
+     n[10] := (32 - 1376*e2 + 609*e2*e2)/3840;
+     n[11] :=  (e2 - 69*e2*e2)/240;
+
+     n[12] := ( 61 + 46*e2  )/(5040*(1 - e2));
+     n[13] := (958 - 1361*e2)/(10080*(1 - e2));
+     n[14] := (358 - 4395*e2)/(10080*(1 - e2));
+     n[15] := ( -2 + 815*e2 )/(10080*(1 - e2));
+
+     n[16] := 0.0038;
+     n[17] := 0.0524;
+
+     n[18] := (18270 - 113789*e2)/362880;
+     n[19] := (1636  -  72123*e2)/362880;
+
+     B1y1 :=          Zo * (   1 - n[1]*Pow(sin(Bo),2) - n[2]*Pow(sin(Bo),4)  - n[3]*Pow(sin(Bo),6)  );
+     B3y3 := -Pow(Zo, 3) * (n[4] + n[5]*Pow(sin(Bo),2) - n[6]*Pow(sin(Bo),4)  - n[7]*Pow(sin(Bo),6)  );
+     B5y5 :=  Pow(Zo, 5) * (n[8] + n[9]*Pow(sin(Bo),2) + n[10]*Pow(sin(Bo),4) - n[11]*Pow(sin(Bo),6) );
+     B7y7 := -Pow(Zo, 7) * (n[12]+ n[13]*Pow(sin(Bo),2)+ n[14]*Pow(sin(Bo),4) - n[15]*Pow(sin(Bo),6) );
+     B9y9 :=  Pow(Zo, 9) * (n[16]+ n[17]*Pow(sin(Bo),2)+ n[18]*Pow(sin(Bo),4) + n[19]*Pow(sin(Bo),6) );
+
+     Result := B1y1 + B3y3 + B5y5 + B7y7 + B9y9;
+  end;
+
+begin
+
+  try
+    _Datum :=  DatumList[DatumN];
+  except
+    OutputB := 0;
+    OutputL := 0;
+    exit;
+  end;
+
+    /// Костыль
+   if  _Datum.Ellipsoid.Name = 'Krasowsky' then
+   begin
+      GaussKrugerToGeo_Kras(x, y, OutputB, OutputL, Lat0, Long0, FN, FE, m);
+      exit;
+   end;
+
+  GetConsts;
+
+  OutputB := Lat0 + XToB(x - FN,y - FE)*180/pi;
+  OutputL := Long0 + YToL(x- FN,y - FE)*180/pi;
+
+end;
+
+
+procedure GeoToGaussKruger(DatumN: Integer; B1, L1 : double; var OutputX, OutputY: double;
+                            var Zone: integer; AutoZone: boolean);  overload;
+
+var
+ e2, e_2, _a, _al : Double;
+ Long0, FE : Double;
+ _Datum : TDatum;
+
+const
+   Linit = 0;
+   ZoneW = 6;
+   FN = 0;
+
+  procedure GetConsts;
+  begin
+     _a := _Datum.Ellipsoid.a;
+     _al := _Datum.Ellipsoid.alpha;
+
+     e2  := 2 * _al - _al*_al;
+     e_2 := e2 / (1 - e2);
+
+  end;
+
+  procedure GetZone (L :Double);
+  begin
+    if AutoZone then
+       Zone := trunc (6 + L + Linit) div  6;
+
+    Long0 := (3 + 6 * (Zone - 1));
+    FE := 500000 + Zone*1000000;
+  end;
+
+  function BToX(B, L: Double) :Double ;
+  var
+      X, Bo, a2l2, a4l4, a6l6, a8l8, lo :Double ;
+      ao, ao2, ao4, ao6, A0, A2, A4, A6, p1, p2, p3 :Double ;
+      k : array[1..16] of Double;
+  begin
+
+     lo := (L - Long0) / 57.29577951;
+     Bo := B / 57.29577951;
+
+     k[1] := _a/4;
+     k[2] := (_a*e2)/8;
+     k[3] := 3*_a*(e2*e2)/32;
+     k[4] := 5*_a*(e2*e2*e2)/64;
+
+     k[5] := _a*(5-e2)/ ( 48* Pow(1 - e2, 2) );
+     k[6] := _a*(12 + 7*e2 + e2*e2)/ ( 96* Pow(1 - e2, 2) );
+     k[7] := _a*(16*e2 + 5*e2*e2)/ ( 128* Pow(1 - e2, 2) );
+     k[8] := 7*_a*e2*e2 / ( 192* Pow(1 - e2, 2) );
+     k[9] := _a*(61 + 270*e2) / 1440;
+     k[10]:= _a*(360 + 2219*e2) / 2880;
+
+     k[11] := _a*(2 + 23*e2) / 24;
+     k[12] := 3*_a*e2 / 8;
+     k[13] := 277*_a / 16128;
+     k[14] := 1211*_a / 13440;
+     k[15] := 91*_a / 672;
+     k[16] := _a / 16;
+
+     a2l2 := Pow(lo, 2)*sin(2*Bo)* ( k[1] +  k[2]*Pow(sin(Bo),2)  + k[3]*Pow(sin(Bo),4)  + k[4]*Pow(sin(Bo),6)  );
+     a4l4 := Pow(lo, 4)*sin(2*Bo)* ( k[5] -  k[6]*Pow(sin(Bo),2)  + k[7]*Pow(sin(Bo),4)  - k[8]*Pow(sin(Bo),6)  );
+     a6l6 := Pow(lo, 6)*sin(2*Bo)* ( k[9] -  k[10]*Pow(sin(Bo),2) + k[11]*Pow(sin(Bo),4) - k[12]*Pow(sin(Bo),6) );
+     a8l8 := Pow(lo, 6)*sin(2*Bo)* ( k[13] - k[14]*Pow(sin(Bo),2) + k[15]*Pow(sin(Bo),4) - k[16]*Pow(sin(Bo),6) );
+
+     A0 := 1 + 3*e2/4 + 45*e2*e2/64 + 175*e2*e2*e2/256 + 11025*e2*e2*e2*e2/16384;
+     A2 := 3*e2/4 + 15*e2*e2/16 + 525*e2*e2*e2/512 + 2205*e2*e2*e2*e2/2048;
+     A4 := 15*e2*e2/64 + 105*e2*e2*e2/256 + 2205*e2*e2*e2*e2/4096;
+     A6 := 35*e2*e2*e2/512 + 315*e2*e2*e2*e2/2048;
+
+     ao  := _a*(1-e2)*A0;
+     ao2 := _a*(1-e2)*A2;
+     ao4 := _a*(1-e2)*A4;
+     ao6 := _a*(1-e2)*A6;
+
+     p1 := 0.5*(ao2 - ao4 + ao6);
+     p2 := ao4 - 8*ao6/3;
+     p3 := 8*ao6/3;
+
+     X := ao*Bo - sin(2*Bo) * (p1 + p2*Pow(sin(Bo),2) + p3*Pow(sin(Bo),4));
+
+     Result := X + a2l2 + a4l4 + a6l6 + a8l8;
+
+  end;
+
+  function LToY( B,  L: Double) :Double ;
+  var
+      lo, Bo, b1l1, b3l3, b5l5, b7l7 : Double ;
+      n : array[1..16] of Double;
+  begin
+
+    lo := (L - Long0) / 57.29577951;
+    Bo := B / 57.29577951;
+
+    n[1]  := _a;
+    n[2]  := _a*e2/2;
+    n[3]  := 3*_a*e2*e2/8;
+    n[4]  := 5*_a*e2*e2*e2/16;
+
+    n[5]  := _a / ( 6 *(1 - e2) );
+    n[6]  := _a*(4 - e2) / ( 12*(1 - e2) );
+    n[7]  := _a*e2*e2 / ( 16*(1 - e2) );
+    n[8]  := _a*e2*e2 / ( 24*(1 - e2) );
+
+    n[9]  := _a*(5 + 4*e2 + 4*e2*e2) / ( 120 *(1 - e2)*(1 - e2) );
+    n[10] := _a*(56 + 83*e2 + 59*e2*e2) / ( 240 *(1 - e2)*(1 - e2) );
+    n[11] := _a*(4 + 16*e2 + 9*e2*e2) / ( 20 *(1 - e2)*(1 - e2) );
+    n[12] := _a*(24*e2 + 11*e2*e2) / ( 48 *(1 - e2)*(1 - e2) );
+
+    n[13] := _a*(61 + 231*e2) / ( 5040*(1 - e2) );
+    n[14] := _a*(1324 + 5339*e2) / ( 10080*(1 - e2) );
+    n[15] := _a*(22 + 95*e2) / ( 84*(1 - e2) );
+    n[16] := _a*(12 + 55*e2) / ( 84*(1 - e2) );
+
+    b1l1 := lo*cos(Bo)* ( n[1] +  n[2]*Pow(sin(Bo),2)  + n[3]*Pow(sin(Bo),4)  + n[4]*Pow(sin(Bo),6)  );
+    b3l3 := Pow(lo, 3)*cos(Bo)* ( n[5] -  n[6]*Pow(sin(Bo),2)  + n[7]*Pow(sin(Bo),4)  - n[8]*Pow(sin(Bo),6)  );
+    b5l5 := Pow(lo, 5)*cos(Bo)* ( n[9] -  n[10]*Pow(sin(Bo),2) + n[11]*Pow(sin(Bo),4) - n[12]*Pow(sin(Bo),6)  );
+    b7l7 := Pow(lo, 7)*cos(Bo)* ( n[13]-  n[14]*Pow(sin(Bo),2) + n[15]*Pow(sin(Bo),4) - n[16]*Pow(sin(Bo),6)  );
+
+    Result := b1l1 + b3l3 + b5l5 + b7l7;
+
+  end ;
+
+begin
+
+  try
+    _Datum :=  DatumList[DatumN];
+  except
+    Outputx:= 0;
+    Outputy := 0;
+    exit;
+  end;
+
+  /// Костыль
+   if  _Datum.Ellipsoid.Name = 'Krasowsky' then
+   begin
+      GeoToGaussKruger_Kras(B1, L1, OutputX, OutputY, Zone, autozone);
+      exit;
+   end;
+
+  GetConsts;
+
+  GetZone(L1);
+
+  OutputX := FN + BToX(B1, L1);
+  OutputY := FE + LToY(B1, L1);
+end;
+
+procedure GeoToGaussKruger(DatumN: Integer; B1, L1 : double; var Outputx, Outputy: double;
+                            Lat0, Long0, FN, FE, m :Double);  overload;
+var
+ e2, e_2, _a, _al : Double;
+ _Datum : TDatum;
+
+
+  procedure GetConsts;
+  begin
+     _a := _Datum.Ellipsoid.a;
+     _al := _Datum.Ellipsoid.alpha;
+
+     e2  := 2 * _al - _al*_al;
+     e_2 := e2 / (1 - e2);
+  end;
+
+  function BToX(B, L: Double) :Double ;
+  var
+      X, Bo, a2l2, a4l4, a6l6, a8l8, lo :Double ;
+      ao, ao2, ao4, ao6, A0, A2, A4, A6, p1, p2, p3 :Double ;
+      k : array[1..16] of Double;
+  begin
+
+     lo := (L - Long0) / 57.29577951;
+     Bo := B / 57.29577951;
+
+     k[1] := _a/4;
+     k[2] := (_a*e2)/8;
+     k[3] := 3*_a*(e2*e2)/32;
+     k[4] := 5*_a*(e2*e2*e2)/64;
+
+     k[5] := _a*(5-e2)/ ( 48* Pow(1 - e2, 2) );
+     k[6] := _a*(12 + 7*e2 + e2*e2)/ ( 96* Pow(1 - e2, 2) );
+     k[7] := _a*(16*e2 + 5*e2*e2)/ ( 128* Pow(1 - e2, 2) );
+     k[8] := 7*_a*e2*e2 / ( 192* Pow(1 - e2, 2) );
+     k[9] := _a*(61 + 270*e2) / 1440;
+     k[10]:= _a*(360 + 2219*e2) / 2880;
+
+     k[11] := _a*(2 + 23*e2) / 24;
+     k[12] := 3*_a*e2 / 8;
+     k[13] := 277*_a / 16128;
+     k[14] := 1211*_a / 13440;
+     k[15] := 91*_a / 672;
+     k[16] := _a / 16;
+
+     a2l2 := Pow(lo, 2)*sin(2*Bo)* ( k[1] +  k[2]*Pow(sin(Bo),2)  + k[3]*Pow(sin(Bo),4)  + k[4]*Pow(sin(Bo),6)  );
+     a4l4 := Pow(lo, 4)*sin(2*Bo)* ( k[5] -  k[6]*Pow(sin(Bo),2)  + k[7]*Pow(sin(Bo),4)  - k[8]*Pow(sin(Bo),6)  );
+     a6l6 := Pow(lo, 6)*sin(2*Bo)* ( k[9] -  k[10]*Pow(sin(Bo),2) + k[11]*Pow(sin(Bo),4) - k[12]*Pow(sin(Bo),6) );
+     a8l8 := Pow(lo, 6)*sin(2*Bo)* ( k[13] - k[14]*Pow(sin(Bo),2) + k[15]*Pow(sin(Bo),4) - k[16]*Pow(sin(Bo),6) );
+
+     A0 := 1 + 3*e2/4 + 45*e2*e2/64 + 175*e2*e2*e2/256 + 11025*e2*e2*e2*e2/16384;
+     A2 := 3*e2/4 + 15*e2*e2/16 + 525*e2*e2*e2/512 + 2205*e2*e2*e2*e2/2048;
+     A4 := 15*e2*e2/64 + 105*e2*e2*e2/256 + 2205*e2*e2*e2*e2/4096;
+     A6 := 35*e2*e2*e2/512 + 315*e2*e2*e2*e2/2048;
+
+     ao  := _a*(1-e2)*A0;
+     ao2 := _a*(1-e2)*A2;
+     ao4 := _a*(1-e2)*A4;
+     ao6 := _a*(1-e2)*A6;
+
+     p1 := 0.5*(ao2 - ao4 + ao6);
+     p2 := ao4 - 8*ao6/3;
+     p3 := 8*ao6/3;
+
+     X := ao*Bo - sin(2*Bo) * (p1 + p2*Pow(sin(Bo),2) + p3*Pow(sin(Bo),4));
+
+     Result := X + a2l2 + a4l4 + a6l6 + a8l8;
+
+  end;
+
+  function LToY( B,  L: Double) :Double ;
+  var
+      lo, Bo, b1l1, b3l3, b5l5, b7l7 : Double ;
+      n : array[1..16] of Double;
+  begin
+    lo := (L - Long0) / 57.29577951;
+    Bo := B / 57.29577951;
+
+    n[1]  := _a;
+    n[2]  := _a*e2/2;
+    n[3]  := 3*_a*e2*e2/8;
+    n[4]  := 5*_a*e2*e2*e2/16;
+
+    n[5]  := _a / ( 6 *(1 - e2) );
+    n[6]  := _a*(4 - e2) / ( 12*(1 - e2) );
+    n[7]  := _a*e2*e2 / ( 16*(1 - e2) );
+    n[8]  := _a*e2*e2 / ( 24*(1 - e2) );
+
+    n[9]  := _a*(5 + 4*e2 + 4*e2*e2) / ( 120 *(1 - e2)*(1 - e2) );
+    n[10] := _a*(56 + 83*e2 + 59*e2*e2) / ( 240 *(1 - e2)*(1 - e2) );
+    n[11] := _a*(4 + 16*e2 + 9*e2*e2) / ( 20 *(1 - e2)*(1 - e2) );
+    n[12] := _a*(24*e2 + 11*e2*e2) / ( 48 *(1 - e2)*(1 - e2) );
+
+    n[13] := _a*(61 + 231*e2) / ( 5040*(1 - e2) );
+    n[14] := _a*(1324 + 5339*e2) / ( 10080*(1 - e2) );
+    n[15] := _a*(22 + 95*e2) / ( 84*(1 - e2) );
+    n[16] := _a*(12 + 55*e2) / ( 84*(1 - e2) );
+
+    b1l1 := lo*cos(Bo)* ( n[1] +  n[2]*Pow(sin(Bo),2)  + n[3]*Pow(sin(Bo),4)  + n[4]*Pow(sin(Bo),6)  );
+    b3l3 := Pow(lo, 3)*cos(Bo)* ( n[5] -  n[6]*Pow(sin(Bo),2)  + n[7]*Pow(sin(Bo),4)  - n[8]*Pow(sin(Bo),6)  );
+    b5l5 := Pow(lo, 5)*cos(Bo)* ( n[9] -  n[10]*Pow(sin(Bo),2) + n[11]*Pow(sin(Bo),4) - n[12]*Pow(sin(Bo),6)  );
+    b7l7 := Pow(lo, 7)*cos(Bo)* ( n[13]-  n[14]*Pow(sin(Bo),2) + n[15]*Pow(sin(Bo),4) - n[16]*Pow(sin(Bo),6)  );
+
+    Result := b1l1 + b3l3 + b5l5 + b7l7;
+
+  end ;
+
+begin
+
+  try
+    _Datum :=  DatumList[DatumN];
+  except
+    OutputX:= 0;
+    OutputY := 0;
+    exit;
+  end;
+
+  /// Костыль
+   if  _Datum.Ellipsoid.Name = 'Krasowsky' then
+   begin
+      GeoToGaussKruger_Kras(B1, L1, OutputX, OutputY, Lat0, Long0, FN, FE, m );
+      exit;
+   end;
+
+  GetConsts;
+
+  OutputX := FN + BToX(B1, L1);
+  OutputY := FE + LToY(B1, L1);
+end;
+
+////////////////////////////////// The same ON ELLIPSOID KRASOWSKY 1940  (GOST!)
+
+procedure GaussKrugerToGeo_Kras(x, y: double; var OutputB, OutputL: double);
+
+  function XToB(X,Y:double):Double ;
+  var
+    No : Integer ;
+    Bi, Bo, Zo, Ba, Bb, Bc, Db : Double ;
+  begin
+    No := trunc(Y / 1000000);
+    Bi := X / 6367558.4968;
+
+    Bo := Bi + sin(Bi * 2) * (0.00252588685 - 0.0000149186 * power(sin(Bi) , 2) + 0.00000011904 * power(sin(Bi) , 4));
+
+    Zo := (Y - (10 * No + 5) * 100000.0) / (6378245.0 * cos(Bo));
+
+    Ba := Zo * Zo * (0.01672 - 0.0063 * power(sin(Bo) , 2) + 0.01188 * power(sin(Bo) , 4) - 0.00328 * power(sin(Bo) , 6));
+    Bb := Zo * Zo * (0.042858 - 0.025318 * power(sin(Bo) , 2) + 0.014346 * power(sin(Bo) , 4) - 0.001264 * power(sin(Bo) , 6) - Ba);
+    Bc := Zo * Zo * (0.10500614 - 0.04559916 * power(sin(Bo) , 2) + 0.00228901 * power(sin(Bo) , 4)
+        - 0.00002987 * power(sin(Bo) , 6) - Bb);
+
+    dB := Zo * Zo * sin(Bo * 2) * (0.251684631 - 0.003369263 * power(sin(Bo) , 2) + 0.000011276 * power(sin(Bo) , 4) - Bc);
+
+    XToB := (Bo - dB) * 180 / Pi;
+  end ;
+
+  function YToL(X,Y:double):Double ;
+   var No : Integer ;
+       Bi, Bo, Zo, La, Lb, Lc, Ld, dL : Double ;
+  begin
+    No := trunc(Y / 1000000);
+    Bi := X / 6367558.4968;
+    Bo := Bi + sin(Bi * 2) * (0.00252588685 - 0.0000149186 * power(sin(Bi) , 2) + 0.00000011904 * power(sin(Bi) , 4));
+    Zo := (Y - (10 * No + 5) * 100000.0) / (6378245.0 * cos(Bo));
+    La := Zo * Zo * (0.0038 + 0.0524 * power(sin(Bo) , 2) + 0.0482 * power(sin(Bo) , 4) + 0.0032 * power(sin(Bo) , 6));
+    Lb := Zo * Zo * (0.01225 + 0.09477 * power(sin(Bo) , 2) + 0.03282 * power(sin(Bo) , 4) - 0.00034 * power(sin(Bo) , 6) - La);
+    Lc := Zo * Zo * (0.0420025 + 0.1487407 * power(sin(Bo) , 2) + 0.005942 * power(sin(Bo) , 4)
+         - 0.000015 * power(sin(Bo) , 6) - Lb);
+    Ld := Zo * Zo * (0.16778975 + 0.16273586 * power(sin(Bo) , 2) - 0.0005249 * power(sin(Bo) , 4)
+         - 0.00000846 * power(sin(Bo) , 6) - Lc);
+    dL := Zo * (1 - 0.0033467108 * power(sin(Bo) , 2) - 0.0000056002 * power(sin(Bo) , 4) - 0.0000000187 * power(sin(Bo) , 6) - Ld);
+    YToL := (6 * (No - 0.5) / 57.29577951 + dL) * 180 / Pi;
+  end;
+
+begin
+  OutputB := XToB(x,y);
+  OutputL := YToL(x,y);
+end;
+
+procedure GaussKrugerToGeo_Kras(x, y: double; var OutputB, OutputL : double;
+                            Lat0, Long0, FN, FE, m :Double);
+  function XToB(X,Y:double):Double ;
+    var  Bi, Bo, Zo, Ba, Bb, Bc, Db : Double ;
+  begin
+
+    Bi := X / 6367558.4968;
+
+    Bo := Bi + sin(Bi * 2) * (0.00252588685 - 0.0000149186 * power(sin(Bi) , 2) + 0.00000011904 * power(sin(Bi) , 4));
+
+    Zo := (Y ) / (6378245.0 * cos(Bo));
+
+    Ba := Zo * Zo * (0.01672 - 0.0063 * power(sin(Bo) , 2) + 0.01188 * power(sin(Bo) , 4) - 0.00328 * power(sin(Bo) , 6));
+    Bb := Zo * Zo * (0.042858 - 0.025318 * power(sin(Bo) , 2) + 0.014346 * power(sin(Bo) , 4) - 0.001264 * power(sin(Bo) , 6) - Ba);
+    Bc := Zo * Zo * (0.10500614 - 0.04559916 * power(sin(Bo) , 2) + 0.00228901 * power(sin(Bo) , 4)
+        - 0.00002987 * power(sin(Bo) , 6) - Bb);
+
+    dB := Zo * Zo * sin(Bo * 2) * (0.251684631 - 0.003369263 * power(sin(Bo) , 2) + 0.000011276 * power(sin(Bo) , 4) - Bc);
+
+    XToB := (Bo - dB) * 180 / Pi;
+  end ;
+
+  function YToL(X,Y:double):Double ;
+    var Bi, Bo, Zo, La, Lb, Lc, Ld, dL : Double ;
+  begin
+
+    Bi := X / 6367558.4968;
+    Bo := Bi + sin(Bi * 2) * (0.00252588685 - 0.0000149186 * power(sin(Bi) , 2) + 0.00000011904 * power(sin(Bi) , 4));
+    Zo := (Y ) / (6378245.0 * cos(Bo));
+    La := Zo * Zo * (0.0038 + 0.0524 * power(sin(Bo) , 2) + 0.0482 * power(sin(Bo) , 4) + 0.0032 * power(sin(Bo) , 6));
+    Lb := Zo * Zo * (0.01225 + 0.09477 * power(sin(Bo) , 2) + 0.03282 * power(sin(Bo) , 4) - 0.00034 * power(sin(Bo) , 6) - La);
+    Lc := Zo * Zo * (0.0420025 + 0.1487407 * power(sin(Bo) , 2) + 0.005942 * power(sin(Bo) , 4)
+         - 0.000015 * power(sin(Bo) , 6) - Lb);
+    Ld := Zo * Zo * (0.16778975 + 0.16273586 * power(sin(Bo) , 2) - 0.0005249 * power(sin(Bo) , 4)
+         - 0.00000846 * power(sin(Bo) , 6) - Lc);
+    dL := Zo * (1 - 0.0033467108 * power(sin(Bo) , 2) - 0.0000056002 * power(sin(Bo) , 4) - 0.0000000187 * power(sin(Bo) , 6) - Ld);
+    YToL := ( Long0 / 57.29577951 + dL) * 180 / Pi;
+  end;
+
+begin
+  OutputB := XToB(x-FN,y-FE);
+  OutputL := YToL(x-FN,y-FE);
+end;
+
+
+procedure GeoToGaussKruger_Kras(B1, L1 : double; var Outputx, Outputy: double;
+                            var Zone: integer; AutoZone: boolean);
+
+  procedure GetZone (L :Double);
+  begin
+    if AutoZone then
+      Zone := trunc (6 + L) div  6;
+  end;
+
+  function BToX(B, L: DOUBLE ) : double ;
+  var No : Integer ;
+      Lo, Bo, Xa,Xb,Xc,Xd : double ;
+  begin
+     No := Zone;
+     Lo := (L - (3 + 6 * (No - 1))) / 57.29577951;
+     Bo := B * Pi / 180;
+     Xa := pow(Lo , 2) * (109500.0 - 574700.0 * pow(sin(Bo) , 2) + 863700.0 * pow(sin(Bo) , 4) - 398600.0 * pow(sin(Bo) , 6));
+     Xb := pow(Lo , 2) * (278194.0 - 830174.0 * pow(sin(Bo) , 2) + 572434.0 * pow(sin(Bo) , 4) - 16010.0 * pow(sin(Bo) , 6) + Xa);
+     Xc := pow(Lo , 2) * (672483.4 - 811219.9 * pow(sin(Bo) , 2) + 5420.0 * pow(sin(Bo) , 4) - 10.6 * pow(sin(Bo) , 6) + Xb);
+     Xd := pow(Lo , 2) * (1594561.25 + 5336.535 * pow(sin(Bo) , 2) + 26.79 * pow(sin(Bo) , 4) + 0.149 * pow(sin(Bo) , 6) + Xc);
+     BToX := 6367558.4968 * Bo - sin(Bo * 2) * (16002.89 + 66.9607 * pow(sin(Bo) , 2) + 0.3515 * pow(sin(Bo) , 4) - Xd);
+  end;
+
+  function LToY( B,  L: double ): double ;
+  var No : Integer;
+      Lo, Bo, Ya, Yb, Yc : double ;
+  begin
+   No := Zone;
+
+   Lo := (L - (3 + 6 * (No - 1))) / 57.29577951;
+   Bo := B * Pi / 180;
+   Ya := pow(Lo , 2) * (79690.0 - 866190.0 * pow(sin(Bo) , 2) + 1730360.0 * pow(sin(Bo) , 4) - 945460.0 * pow(sin(Bo) , 6));
+   Yb := pow(Lo , 2) * (270806.0 - 1523417.0 * pow(sin(Bo) , 2) + 1327645.0 * pow(sin(Bo) , 4) - 21701.0 * pow(sin(Bo) , 6) + Ya);
+   Yc := pow(Lo , 2) * (1070204.16 - 2136826.66 * pow(sin(Bo) , 2) + 17.98 * pow(sin(Bo) , 4) - 11.99 * pow(sin(Bo) , 6) + Yb);
+   LToY := (5 + 10 * No) * 100000.0 + Lo * cos(Bo) *(6378245 + 21346.1415 * pow(sin(Bo) , 2)
+           + 107.159 *pow(sin(Bo) , 4) + 0.5977 * pow(sin(Bo) , 6) + Yc);
+  end ;
+
+begin
+  GetZone(L1);
+  Outputx := BToX(B1, L1);
+  Outputy := LToY(B1, L1);
+end;
+
+procedure GeoToGaussKruger_Kras(B1, L1 : double; var Outputx, Outputy: double;
+                            Lat0, Long0, FN, FE, m :Double);
+
+
+  function BToX(B, L: DOUBLE ) : double ;
+  var  Lo, Bo, Xa,Xb,Xc,Xd : double ;
+  begin
+
+     Lo := (L - Long0) / 57.29577951;
+     Bo := B * Pi / 180;
+     Xa := pow(Lo , 2) * (109500.0 - 574700.0 * pow(sin(Bo) , 2) + 863700.0 * pow(sin(Bo) , 4) - 398600.0 * pow(sin(Bo) , 6));
+     Xb := pow(Lo , 2) * (278194.0 - 830174.0 * pow(sin(Bo) , 2) + 572434.0 * pow(sin(Bo) , 4) - 16010.0 * pow(sin(Bo) , 6) + Xa);
+     Xc := pow(Lo , 2) * (672483.4 - 811219.9 * pow(sin(Bo) , 2) + 5420.0 * pow(sin(Bo) , 4) - 10.6 * pow(sin(Bo) , 6) + Xb);
+     Xd := pow(Lo , 2) * (1594561.25 + 5336.535 * pow(sin(Bo) , 2) + 26.79 * pow(sin(Bo) , 4) + 0.149 * pow(sin(Bo) , 6) + Xc);
+     BToX := 6367558.4968 * Bo - sin(Bo * 2) * (16002.89 + 66.9607 * pow(sin(Bo) , 2) + 0.3515 * pow(sin(Bo) , 4) - Xd);
+  end;
+
+  function LToY( B,  L: double ): double ;
+  var Lo, Bo, Ya, Yb, Yc : double ;
+  begin
+
+
+   Lo := (L - Long0) / 57.29577951;
+   Bo := B * Pi / 180;
+   Ya := pow(Lo , 2) * (79690.0 - 866190.0 * pow(sin(Bo) , 2) + 1730360.0 * pow(sin(Bo) , 4) - 945460.0 * pow(sin(Bo) , 6));
+   Yb := pow(Lo , 2) * (270806.0 - 1523417.0 * pow(sin(Bo) , 2) + 1327645.0 * pow(sin(Bo) , 4) - 21701.0 * pow(sin(Bo) , 6) + Ya);
+   Yc := pow(Lo , 2) * (1070204.16 - 2136826.66 * pow(sin(Bo) , 2) + 17.98 * pow(sin(Bo) , 4) - 11.99 * pow(sin(Bo) , 6) + Yb);
+   LToY := Lo * cos(Bo) *(6378245 + 21346.1415 * pow(sin(Bo) , 2)
+           + 107.159 *pow(sin(Bo) , 4) + 0.5977 * pow(sin(Bo) , 6) + Yc);
+  end ;
+
+begin
+  Outputx := FN + BToX(B1, L1);
+  Outputy := FE + LToY(B1, L1);
+end;
+
+
+
+procedure GeoToUTM(DatumN: Integer; B, L: double; South: Boolean;
+                    var OutputNorthing, OutputEasting: double;
+                    var Zone: integer; AutoZone: boolean);
+
+var   Linit, k0, FN, FE, e_2, e2, nu, fi, lambda, A, C, T, M0, M, fi0, Lo, lambda0, ZoneW : Double;
+      _Datum : TDatum;
+      _a, _al: Double;
+
+ procedure CheckHemisphere;
+ begin
+  {if B < 0 then
+  begin
+      South := not South;// true;
+      B := -B;
+  end; }
+  if South then
+   //if B<0 then
+     B := - B;
+ end;
+
+ procedure GetConsts;
+ begin
+   FE := 500000;
+   k0 := 0.9996;
+
+   FN :=0;
+   if South then
+     FN := 10000000;
+
+   fi0 := 0;
+   Linit := 180;
+   ZoneW := 6;
+
+   _a := _Datum.Ellipsoid.a;
+   _al := _Datum.Ellipsoid.alpha;
+
+   e2  := 2 * _al - _al*_al;
+   e_2 := e2 / (1 - e2);
+ end;
+
+ function GetZone :integer;
+ begin
+   Result := trunc((L + Linit + ZoneW)/ZoneW);
+ end;
+
+ function GetM(_fi:double) :Double;
+ begin
+   Result := _a*( (1-e2/4 - 3*e2*e2/64 - 5*e2*e2*e2/256  {- ...})*_fi
+                - (3*e2/8 + 3*e2*e2/32 +45*e2*e2*e2/1024 {+ ...})*sin(2*_fi)
+                + (15*e2*e2/256 + 45*e2*e2*e2/1024 {+ ...})*sin(4*_fi)
+                - (35*e2*e2*e2/3072 {+ ...})*sin(6*_fi) {+ ...});
+ end;
+
+Begin
+  try
+    _Datum :=  DatumList[DatumN];
+  except
+    OutputNorthing := 0;
+    OutputEasting := 0;
+    exit;
+  end;
+
+  CheckHemisphere;
+
+  GetConsts;
+
+  if AutoZone then
+    Zone := GetZone;
+
+  Lo := Zone*ZoneW - ( Linit + ZoneW/2 );
+
+  fi := B * pi / 180;
+  lambda := L * pi / 180;
+  lambda0 := Lo * pi / 180;
+
+  nu := _a / Sqrt( 1 - e2*sqr(sin(fi)) );
+  T :=  sqr(tan(fi));
+  C :=  e2*Sqr(cos(fi))/(1 - e2);
+  A := (lambda - lambda0)*cos(fi);
+  //M0 := GetM(fi0);    !!! M(0) = 0
+  M0 := 0;
+  M :=  GetM(fi);
+
+  /// Easting
+  OutputEasting := Zone * 1000000 + FE + k0 * nu *
+             ( A + (1 - T + C)*Pow(A,3)/6 +
+             (5 - 18*T + T*T + 72*C - 58*e_2)* Pow(A, 5)/120 ) ;
+
+  OutputNorthing :=  FN + k0 * (M - M0 + nu*tan(fi)* (A*A/2
+              + (5 - T + 9*C + 4*C*C)*Pow(A,4)/24
+              + (61 - 58*T + T*T + 600*C - 330*e_2)*Pow(A,6)/720));
+
+
+  if South then
+  Begin
+     //// Here: WESTING!!!!
+     OutputEasting := Zone * 1000000 + FE - k0 * nu *
+             ( A + (1 - T + C)*Pow(A,3)/6 +
+             (5 - 18*T + T*T + 72*C - 58*e_2)* Pow(A, 5)/120 ) ;
+
+     ///// Here: SOUTHING !!!
+     OutputNorthing :=  FN - k0 * (M - M0 + nu*tan(fi)* (A*A/2
+              + (5 - T + 9*C + 4*C*C)*Pow(A,4)/24
+              + (61 - 58*T + T*T + 600*C - 330*e_2)*Pow(A,6)/720));
+
+  End;
+End;
+
+procedure GeoToUTM(DatumN: Integer; B, L: double; South: Boolean;
+                      var OutputNorthing, OutputEasting: double;
+                      Lat0, Long0, FN, FE, ms :Double);
+var   k0, e_2, e2, nu, fi, lambda, A, C, T, M0, M, fi0, Lo, lambda0 : Double;
+      _Datum : TDatum;
+      _a, _al: Double;
+
+ procedure CheckHemisphere;
+ begin
+  if South then
+     B := - B;
+ end;
+
+ procedure GetConsts;
+ begin
+   k0 := ms;
+
+   fi0 := 0;
+
+   _a := _Datum.Ellipsoid.a;
+   _al := _Datum.Ellipsoid.alpha;
+
+   e2  := 2 * _al - _al*_al;
+   e_2 := e2 / (1 - e2);
+ end;
+
+ function GetM(_fi:double) :Double;
+ begin
+   Result := _a*( (1-e2/4 - 3*e2*e2/64 - 5*e2*e2*e2/256  {- ...})*_fi
+                - (3*e2/8 + 3*e2*e2/32 +45*e2*e2*e2/1024 {+ ...})*sin(2*_fi)
+                + (15*e2*e2/256 + 45*e2*e2*e2/1024 {+ ...})*sin(4*_fi)
+                - (35*e2*e2*e2/3072 {+ ...})*sin(6*_fi) {+ ...});
+ end;
+
+Begin
+  try
+    _Datum :=  DatumList[DatumN];
+  except
+    OutputNorthing := 0;
+    OutputEasting := 0;
+    exit;
+  end;
+
+  CheckHemisphere;
+
+  GetConsts;
+
+  Lo := Long0;
+
+  fi := B * pi / 180;
+  lambda := L * pi / 180;
+  lambda0 := Lo * pi / 180;
+
+  nu := _a / Sqrt( 1 - e2*sqr(sin(fi)) );
+  T :=  sqr(tan(fi));
+  C :=  e2*Sqr(cos(fi))/(1 - e2);
+  A := (lambda - lambda0)*cos(fi);
+  //M0 := GetM(fi0);    !!! M(0) = 0
+  M0 := 0;
+  M :=  GetM(fi);
+
+  /// Easting
+  OutputEasting := FE + k0 * nu *
+             ( A + (1 - T + C)*Pow(A,3)/6 +
+             (5 - 18*T + T*T + 72*C - 58*e_2)* Pow(A, 5)/120 ) ;
+
+  OutputNorthing :=  FN + k0 * (M - M0 + nu*tan(fi)* (A*A/2
+              + (5 - T + 9*C + 4*C*C)*Pow(A,4)/24
+              + (61 - 58*T + T*T + 600*C - 330*e_2)*Pow(A,6)/720));
+
+
+  if South then
+  Begin
+     OutputEasting :=  FE - k0 * nu *
+             ( A + (1 - T + C)*Pow(A,3)/6 +
+             (5 - 18*T + T*T + 72*C - 58*e_2)* Pow(A, 5)/120 ) ;
+
+     OutputNorthing :=  FN - k0 * (M - M0 + nu*tan(fi)* (A*A/2
+              + (5 - T + 9*C + 4*C*C)*Pow(A,4)/24
+              + (61 - 58*T + T*T + 600*C - 330*e_2)*Pow(A,6)/720));
+
+  End;
+End;
+
+procedure UTMToGeo(DatumN: Integer; Northing, Easting: double; South: Boolean;
+          Zone : integer; var OutputB, OutputL: double);
+
+var   Linit, k0, FN, FE, e_2, e2, e1, nu1, ro1, fi, fi1, lambda, T1, C1, D, fi0, Lo,
+      lambda0, ZoneW, M0, M1, mu1 : Double;
+      _Datum : TDatum;
+      _a, _al: Double;
+     // zone : integer;
+
+ procedure GetConsts;
+ begin
+   FE := 500000;
+   k0 := 0.9996;
+
+   FN :=0;
+   if South then
+     FN := 10000000;
+
+   fi0 := 0;
+   Linit := 180;
+   ZoneW := 6;
+
+   _a := _Datum.Ellipsoid.a;
+   _al := _Datum.Ellipsoid.alpha;
+
+   e2  := 2 * _al - _al*_al;
+   e_2 := e2 / (1 - e2);
+
+   e1 := ( 1 - sqrt(1-e2)) / (1 + sqrt(1 - e2));
+ end;
+
+ function GetZone :integer;
+ begin
+
+   if Zone = 0 then
+     Result := trunc(Easting / 1000000)
+       else
+         Begin
+           Result := Zone;
+           if (Easting < 1000000)and(Zone >0) then
+              Easting := Easting + Zone * 1000000;
+         end;
+ end;
+
+ function GetM(_fi:double) :Double;
+ begin
+   Result := _a*( (1-e2/4 - 3*e2*e2/64 - 5*e2*e2*e2/256  {- ...})*_fi
+                - (3*e2/8 + 3*e2*e2/32 +45*e2*e2*e2/1024 {+ ...})*sin(2*_fi)
+                + (15*e2*e2/256 + 45*e2*e2*e2/1024 {+ ...})*sin(4*_fi)
+                - (35*e2*e2*e2/3072 {+ ...})*sin(6*_fi) {+ ...});
+ end;
+
+begin
+  try
+    _Datum :=  DatumList[DatumN];
+  except
+    OutputB := 0;
+    OutputL := 0;
+    exit;
+  end;
+
+  GetConsts;
+
+  Zone := GetZone;
+
+  Lo := Zone*ZoneW - ( Linit + ZoneW/2 );
+
+  lambda0 := Lo * pi / 180;
+
+  M0 := 0;
+
+  if South then
+    M1 := M0 - (Northing - FN) / k0
+      else
+        M1 := M0 + (Northing - FN) / k0;
+
+  mu1 := M1 / (_a*(1 - e2/4 - 3*e2*e2/64 - 5*e2*e2*e2/256 {- ...}));
+
+  fi1 :=  mu1 + (3*e1/2 - 27*e1*e1*e1/32 {+ ...} )*sin(2*mu1)
+          + (21*e1*e1/16 - 55*e1*e1*e1*e1/32 {+ ...} )*sin(4*mu1)
+          + (151*e1*e1*e1/96 {+ ...} )*sin(6*mu1)
+          + (1097*e1*e1*e1*e1/512 {+ ...} )*sin(8*mu1);
+
+  nu1 := _a / Sqrt( 1 - e2*sqr(sin(fi1)) );
+  ro1 := _a* (1 - e2) / Pow((1 - e2*sqr(sin(fi1))),1.5);
+
+  T1 :=  sqr(tan(fi1));
+  C1 :=  e_2*Sqr(cos(fi1));
+
+  if South then
+     D := -( Easting - (FE + Zone*1000000) )/(nu1*k0)
+       else
+          D := ( Easting - (FE + Zone*1000000) )/(nu1*k0);
+
+
+  fi := fi1 - (nu1*tan(fi1)/ro1)*(D*D/2 - (5 + 3*T1 + 10*C1 - 4*C1*C1 - 9*e_2)*Pow(D,4)/24
+        + (61 + 90*T1 - 298*C1 + 45*T1*T1 - 252*e_2 - 3*C1*C1)*Pow(D,6)/720);
+
+  lambda := lambda0 + ( D - (1 + 2*T1 +C1)*Pow(D,3)/6 + (5 - 2*C1 +28*T1 - 3*C1*C1 +8*e_2
+            + 24*T1*T1)*Pow(D,5)/120 )/cos(fi1);
+
+  OutputB := fi / pi *180 ;
+  OutputL := lambda / pi *180 ;
+
+//  if South then
+//    if OutputL > 0 then
+//       OutputL :=  -OutputL;
+
+  if South then
+  //  if OutputB > 0 then
+       OutputB :=  -OutputB;
+
+end;
+
+procedure UTMToGeo(DatumN: Integer; Northing, Easting: double; South: Boolean;
+          var OutputB, OutputL: double);
+Begin
+   UTMToGeo(DatumN, Northing, Easting, South, 0, OutputB, OutputL);
+End;
+
+procedure UTMToGeo(DatumN: Integer; Northing, Easting: double; South: Boolean;
+                      var OutputB, OutputL: double;
+                      Lat0, Long0, FN, FE, m :Double);   overload;
+var   k0, e_2, e2, e1, nu1, ro1, fi, fi1, lambda, T1, C1, D, fi0, Lo,
+      lambda0, M0, M1, mu1 : Double;
+      _Datum : TDatum;
+      _a, _al: Double;
+     // zone : integer;
+
+ procedure GetConsts;
+ begin
+
+   k0 := m;
+
+   fi0 := 0;
+
+
+   _a := _Datum.Ellipsoid.a;
+   _al := _Datum.Ellipsoid.alpha;
+
+   e2  := 2 * _al - _al*_al;
+   e_2 := e2 / (1 - e2);
+
+   e1 := ( 1 - sqrt(1-e2)) / (1 + sqrt(1 - e2));
+ end;
+
+{ function GetZone :integer;
+ begin
+   Result := trunc(Easting / 1000000);
+ end;  }
+
+ function GetM(_fi:double) :Double;
+ begin
+   Result := _a*( (1-e2/4 - 3*e2*e2/64 - 5*e2*e2*e2/256  {- ...})*_fi
+                - (3*e2/8 + 3*e2*e2/32 +45*e2*e2*e2/1024 {+ ...})*sin(2*_fi)
+                + (15*e2*e2/256 + 45*e2*e2*e2/1024 {+ ...})*sin(4*_fi)
+                - (35*e2*e2*e2/3072 {+ ...})*sin(6*_fi) {+ ...});
+ end;
+
+begin
+  try
+    _Datum :=  DatumList[DatumN];
+  except
+    OutputB := 0;
+    OutputL := 0;
+    exit;
+  end;
+
+  GetConsts;
+
+ // Zone := GetZone;
+
+  Lo := Long0;
+
+  lambda0 := Lo * pi / 180;
+
+  M0 := 0;
+
+  if South then
+    M1 := M0 - (Northing - FN) / k0
+      else
+        M1 := M0 + (Northing - FN) / k0;
+
+  mu1 := M1 / (_a*(1 - e2/4 - 3*e2*e2/64 - 5*e2*e2*e2/256 {- ...}));
+
+  fi1 :=  mu1 + (3*e1/2 - 27*e1*e1*e1/32 {+ ...} )*sin(2*mu1)
+          + (21*e1*e1/16 - 55*e1*e1*e1*e1/32 {+ ...} )*sin(4*mu1)
+          + (151*e1*e1*e1/96 {+ ...} )*sin(6*mu1)
+          + (1097*e1*e1*e1*e1/512 {+ ...} )*sin(8*mu1);
+
+  nu1 := _a / Sqrt( 1 - e2*sqr(sin(fi1)) );
+  ro1 := _a* (1 - e2) / Pow((1 - e2*sqr(sin(fi1))),1.5);
+
+  T1 :=  sqr(tan(fi1));
+  C1 :=  e_2*Sqr(cos(fi1));
+
+  if South then
+     D := -( Easting - (FE) )/(nu1*k0)
+       else
+          D := ( Easting - (FE) )/(nu1*k0);
+
+
+  fi := fi1 - (nu1*tan(fi1)/ro1)*(D*D/2 - (5 + 3*T1 + 10*C1 - 4*C1*C1 - 9*e_2)*Pow(D,4)/24
+        + (61 + 90*T1 - 298*C1 + 45*T1*T1 - 252*e_2 - 3*C1*C1)*Pow(D,6)/720);
+
+  lambda := lambda0 + ( D - (1 + 2*T1 +C1)*Pow(D,3)/6 + (5 - 2*C1 +28*T1 - 3*C1*C1 +8*e_2
+            + 24*T1*T1)*Pow(D,5)/120 )/cos(fi1);
+
+  OutputB := fi / pi *180 ;
+  OutputL := lambda / pi *180 ;
+
+  if South then
+       OutputB :=  -OutputB
+end;
+
+
+procedure PVMtoUTM (DatumN: Integer; B, L: double; var Northing, Easting: double);
+
+var   FN, FE, _log, Lo :Double;
+      _Datum :TDatum;
+      _a :Double;
+
+ procedure GetConsts;
+ begin
+   FE := 0;
+   FN :=0;
+   _a := _Datum.Ellipsoid.a;
+ end;
+
+Begin
+  try
+    _Datum :=  DatumList[DatumN];
+  except
+     Easting :=0;  Northing := 0;
+    exit;
+  end;
+
+  GetConsts;
+
+  B := B*pi/180;
+  L := L*pi/180;
+
+  Lo := 0;
+
+  _log := ln( tan( pi/4 + B/2));
+
+  Easting :=  (FE) + _a*(L-Lo);
+  Northing := FN + _a*_log;
+
+End;
+
+
+procedure UTMToPVM(DatumN: Integer; Northing,Easting: double; var OutputB, OutputL: double);
+var   {Linit,} FN, FE, Lo : Double;
+      _Datum : TDatum;
+      _a: Double;
+      //Zone: Integer;
+const e = 2.7182818;
+var D: Double;
+
+ procedure GetConsts;
+ begin
+   FE := 0;
+
+   FN :=0;
+
+
+    _a := _Datum.Ellipsoid.a;
+    D :=  -Northing/_a;
+ end;
+
+Begin
+
+  try
+    _Datum :=  DatumList[DatumN];
+  except
+    OutputB := 0;
+    OutputL := 0;
+    exit;
+  end;
+
+   GetConsts;
+
+   Lo := 0;///Zone*ZoneW - ( Linit + ZoneW/2 );
+
+   OutputB := ( pi/2 - 2*arctan( POWER(e,D)) ) *180/pi;
+   OutputL :=  Lo + ((Easting-FE)/_a )*180/pi;
+
+End;
+
+
+
+function Geo1ToGeo2(B1, L1, H1 : double; InputSKNumber, OutputSKNumber :Integer; var B2, L2, H2 : double):string;
+
+// Вспомогательные значения для преобразования эллипсоидов
+
+  var
+  InputSK, OutputSK :TDatum;
+
+  /// 1-я СК
+  a_1 : Double;   // Полуось и сжатие  СК 1
+  al_1 : Double;
+  e2_1 : Double;  // Квадрат эксцентриситета эллипсоида 1й СК
+
+  /// 2-я СК
+  a_2 : Double;   // Полуось и сжатие  СК 2
+  al_2 : Double;
+  e2_2 : Double;  // Квадрат эксцентриситета эллипсоида 2й СК
+
+  /// Среднее/разности
+  a : Double;
+  e2 : Double;
+  da : Double;
+  de2 : Double;
+
+  // Линейные элементы трансформирования, м
+  dx: Double;
+  dy: Double;
+  dz: Double;
+
+  // Угловые элементы трансформирования, в секундах
+  wx: Double;
+  wy: Double;
+  wz: Double ;
+
+  // Дифференциальное различие масштабов
+  ms : Double;
+
+  ConvertDataN : integer;
+  Reverse : boolean;
+
+  B2_0, L2_0, H2_0: Double; /// первая итеррация
+
+  procedure GetAllConsts;
+  begin
+    a_1 := InputSK.ellipsoid.a;
+    a_2 := OutputSK.ellipsoid.a;
+
+    al_1 := InputSK.ellipsoid.alpha;
+    al_2 := OutputSK.ellipsoid.alpha;
+
+    e2_1 := 2 * al_1 - al_1*al_1;
+    e2_2 := 2 * al_2 - al_2*al_2;
+
+    a := (a_1 + a_2) / 2 ;
+    e2 := (e2_1 + e2_2) / 2;
+
+    da := a_1 - a_2  ;
+    de2 := e2_1 - e2_2;
+
+    if Reverse = false then
+    begin
+      dx := OutputSK.ConvertData[ConvertDataN].dx;
+      dy := OutputSK.ConvertData[ConvertDataN].dy;
+      dz := OutputSK.ConvertData[ConvertDataN].dz;
+
+      wx := OutputSK.ConvertData[ConvertDataN].wx;
+      wy := OutputSK.ConvertData[ConvertDataN].wy;
+      wz := OutputSK.ConvertData[ConvertDataN].wz;
+
+      ms := OutputSK.ConvertData[ConvertDataN].ms;
+    end
+      else
+       Begin
+         dx := - InputSK.ConvertData[ConvertDataN].dx;
+         dy := - InputSK.ConvertData[ConvertDataN].dy;
+         dz := - InputSK.ConvertData[ConvertDataN].dz;
+
+         wx := - InputSK.ConvertData[ConvertDataN].wx;
+         wy := - InputSK.ConvertData[ConvertDataN].wy;
+         wz := - InputSK.ConvertData[ConvertDataN].wz;
+
+         ms := - InputSK.ConvertData[ConvertDataN].ms;
+       end;
+  end;
+
+  function dB(Bd, Ld, H: Double) : Double;
+  var B, L, M, N : Double;
+  begin
+    B := Bd * Pi / 180 ;
+    L := Ld * Pi / 180 ;
+    M := a * (1 - e2) / Pow( (1 - e2 * Sin(B) * Sin(B)), 1.5);
+    N := a * Pow((1 - e2 * Sin(B) * Sin(B)), -0.5) ;
+
+    dB := ro / (M + H) * (N / a * e2 * Sin(B) * Cos(B) * da
+          + (N * N/ (a * a) + 1) * N * Sin(B) * Cos(B) * de2 / 2
+          - (dx * Cos(L) + dy * Sin(L)) * Sin(B) + dz * Cos(B))
+          - wx * Sin(L) * (1 + e2 * Cos(2 * B))
+          + wy * Cos(L) * (1 + e2 * Cos(2 * B))
+          - ro * ms * e2 * Sin(B) * Cos(B) ;
+  end;
+
+  function dL(Bd, Ld, H: Double) : Double;
+  var B, L, N : Double;
+  begin
+    B := Bd * Pi / 180;
+    L := Ld * Pi / 180;
+    N := a * Pow((1 - e2 * Sin(B) * Sin (B)), -0.5);
+    dL := ro / ((N + H) * Cos(B)) * (-dx * Sin(L) + dy * Cos(L))
+		      + Tan(B) * (1 - e2) * (wx * Cos(L) + wy * Sin(L)) - wz;
+  end;
+
+  function dH(Bd, Ld, H :Double) : Double;
+  var B, L, N : Double ;
+  Begin
+    B := Bd * Pi / 180 ;
+    L := Ld * Pi / 180 ;
+    N := a * Pow((1 - e2 * Sin(B) * Sin(B) ), -0.5) ;
+    dH := -a / N * da + N * Sin(B) * Sin(B) * de2 / 2 
+			    + (dx * Cos(L) + dy * Sin(L)) * Cos(B) + dz * Sin(B)
+			    - N * e2 * Sin(B) * Cos(B) * (wx / ro * Sin(L) - wy / ro * Cos(L))
+			    + (a * a / N + H) * ms;
+  End;
+
+begin
+  try
+    InputSK :=  DatumList[InputSKNumber];
+    OutputSK := DatumList[OutputSKNumber];
+  except
+    B2 := 0;
+    L2 := 0;
+    H2 := 0;
+    Result := 'Не найдены системы координат!';
+    exit;
+  end;
+
+  Reverse := false;
+  ConvertDataN := FindConvertData(OutputSK, InputSK.Name);
+
+  If ConvertDataN = -1 then
+  begin
+     Reverse := true;
+     ConvertDataN := FindConvertData(InputSK, OutputSK.Name);
+  end;
+
+  If ConvertDataN = -1 then
+  begin
+    B2 := 0;
+    L2 := 0;
+    H2 := 0;
+    Result := 'Не найдены параметры перехода!';
+    exit;
+  end;
+
+  GetAllConsts;
+
+  B2_0 := dB(B1,L1,H1)/3600;
+  L2_0 := dL(B1,L1,H1)/3600;
+  H2_0 := dH(B1,L1,H1);
+
+  B2 := dB(B1 - B2_0,L1 - L2_0,H1 - H2_0)/3600;
+  L2 := dL(B1 - B2_0,L1 - L2_0,H1 - H2_0)/3600;
+  H2 := dH(B1 - B2_0,L1 - L2_0,H1 - H2_0);
+
+  B2 := B1 - (B2_0 + B2)/2;
+  L2 := L1 - (L2_0 + L2)/2;
+  H2 := H1 - (H2_0 + H2)/2;
+
+  Result := SuccessStr;
+end;
+
+function Geo1ForceToGeo2(B1, L1, H1 : double; InputSKNumber, OutputSKNumber :Integer;
+                         var B2, L2, H2 : double): string;
+var GeoSteps, GeoDatums: array of integer;
+    ShortestisBad : boolean;
+  
+  function AlreadyInSteps (SearchingN: integer) : boolean;
+  var j : integer;
+  begin
+     Result := false;
+
+     For j := 0 to length(GeoSteps)-1 do
+       if (GeoSteps[j] = SearchingN)
+          or((TransformationList[GeoSteps[j]].InputDatumName = TransformationList[SearchingN].InputDatumName)and
+           (TransformationList[GeoSteps[j]].ConvertDatumName = TransformationList[SearchingN].ConvertDatumName))
+          or((TransformationList[GeoSteps[j]].InputDatumName = TransformationList[SearchingN].ConvertDatumName)and
+           (TransformationList[GeoSteps[j]].ConvertDatumName = TransformationList[SearchingN].InputDatumName)) then
+         begin
+           Result := true;
+           Break;
+         end;
+  end;
+
+  function GetBad : boolean;
+  var j : integer;
+  begin
+     Result := false;
+
+     For j := 0 to length(GeoSteps)-1 do
+       if TransformationList[Geosteps[j]].BadData then
+         begin
+           Result := true;
+           Break;
+         end;
+  end;
+
+  function SearchResult(current_v, result_v: Integer; Bad: boolean):boolean;
+  var j, k: integer;
+      curr_sc, res_sc :integer;
+  begin
+     Result := false;
+
+     For j := 0 to length(TransformationList)-1 do
+     begin
+        curr_sc := FindDatum(TransformationList[j].InputDatumName);  /// № входного датума для текущего эелемета массива трансформаций
+        res_sc :=  FindDatum(TransformationList[j].ConvertDatumName);  /// № итогового датума для текущего эелемета массива трансформаций
+
+        if j=27 then
+         res_sc:=res_sc*1;
+
+        if (curr_sc = -1) or (res_sc = -1) then
+          continue;
+
+        if AlreadyInSteps(j) then
+          continue;
+
+        if curr_sc = current_v then
+        begin
+           SetLength(GeoSteps,length(GeoSteps)+1);        // APPEND
+           GeoSteps[length(GeoSteps)-1] := j;             //
+
+           Bad := GetBad;
+
+           if res_sc <> result_v then
+              begin
+                     if (length(ShortestConv) > 0) and (length(ShortestConv) < length(GeoSteps))
+                     and  (ShortestIsBad = false) then
+                    begin
+                      Result := false;
+                      SetLength(GeoSteps,length(GeoSteps)-1);
+                      break;
+                    end else
+                    begin
+
+                      if SearchResult(res_sc, result_v, Bad) = false then
+                      begin
+                          Result := false;
+                      end
+                      else
+                        begin
+                          Result := false;
+                          continue;
+                        end;
+
+                    end;
+              end
+               else
+               begin
+                 Result := true;
+
+                 if (length(ShortestConv) = 0) or (length(ShortestConv) > length(GeoSteps))
+                    or ((Bad=false)and(ShortestIsBad)) then
+                    begin
+                       Setlength(ShortestConv, length(GeoSteps));
+                       for k := 0 to Length(GeoSteps)-1 do
+                          ShortestConv[k] := GeoSteps[k];
+                       ShortestisBad := Bad;
+                    end;
+                  SetLength(GeoSteps,length(GeoSteps)-1);
+                  break;
+               end;
+
+
+        end;
+     end;
+
+     if Length(GeoSteps)>0 then
+       SetLength(GeoSteps,length(GeoSteps)-1);
+  end;
+
+var i, k :integer;
+    alreadyfound: boolean;
+begin
+
+  try
+    Result := 'Выполняю: ' + DatumList[InputSKNumber].Name;
+  except
+    Result := 'Исходная СК не найдена!';
+    exit;
+  end;
+
+
+  if InputSKnumber = OutputSKNumber then
+  begin
+      B2 := B1;
+      L2 := L1;
+      H2 := H1;
+      exit;
+  end;
+  alreadyfound := false;
+
+  if Length(ShortestConv)<>0 then
+    alreadyfound := (ShortIn = InputSKNumber) and
+       (ShortOut = OutputSKNumber);
+
+  IF alreadyfound THEN
+  BEGIN
+      Setlength(GeoSteps, length(ShortestConv));
+      for k := 0 to Length(ShortestConv)-1 do
+        GeoSteps[k] := ShortestConv[k];
+
+     { SetLength(GeoDatums,length(GeoSteps)+1);
+      GeoDatums[0] := InputSKNumber;}
+  END
+  ELSE
+  BEGIN
+    SetLength(GeoSteps,0);
+    SetLength(ShortestConv,0);
+    SearchResult(InputSKNumber, OutputSKNumber, False);
+  END;
+
+    if length(ShortestConv)>0 then
+    begin
+      Setlength(GeoSteps, length(ShortestConv));
+      for k := 0 to Length(ShortestConv)-1 do
+        GeoSteps[k] := ShortestConv[k];
+
+      SetLength(GeoDatums,length(GeoSteps)+1);
+      GeoDatums[0] := InputSKNumber;
+
+      ShortIn :=  InputSKNumber;
+      ShortOut :=  OutputSKNumber;
+        
+      for i := 0 to length(GeoSteps)-1 do                //// Возвращаю номера датумов из списка конвертаций
+      Begin
+        GeoDatums[i+1] := FindDatum(TransformationList[GeoSteps[i]].ConvertDatumName);
+        Result := Result +' -> '+ DatumList[GeoDatums[i+1]].Name;
+      End;
+
+    for i := 1 to length(GeoDatums)-1 do
+    begin
+       if Geo1ToGeo2(B1, L1, H1, GeoDatums[i-1], GeoDatums[i], B2, L2, H2) = SuccessStr then
+       begin
+        B1 := B2;
+        L1 := L2;
+        H1 := H2;
+       end
+         else
+          begin
+            Result := Result  + '. Ошибка перевода к: ' + DatumList[GeoDatums[i]].Name;
+            exit;
+          end;
+    end;
+    Result := Result + SuccessStr;
+  end
+   else
+      Result := 'Параметры перехода не найдены';
+
+end;
+
+procedure CoordinateSystemToDatum(CSN: integer; X, Y, H: Double; var OutputB, OutputL, OutputH: Double);
+var ProjType: integer;
+    DatumN: integer;
+begin
+
+   try
+     ProjType:= CoordinateSystemList[CSN].ProjectionType;
+     DatumN  :=  CoordinateSystemList[CSN].DatumN;
+   except
+     OutputB := 0;
+     OutputL := 0;
+     OutputH := 0;
+     exit;
+   end;
+
+    Case ProjType of
+       4 : begin
+           OutputH := H;
+
+           UTMToGeo(DatumN, X,Y, true,OutputB,OutputL,CoordinateSystemList[CSN].Parameters[1],
+                                CoordinateSystemList[CSN].Parameters[0],
+                                CoordinateSystemList[CSN].Parameters[4],
+                                CoordinateSystemList[CSN].Parameters[3],
+                                CoordinateSystemList[CSN].Parameters[2]);
+         end;
+
+       3 : begin
+           OutputH := H;
+
+           UTMToGeo(DatumN, X,Y, false,OutputB,OutputL,CoordinateSystemList[CSN].Parameters[1],
+                                CoordinateSystemList[CSN].Parameters[0],
+                                CoordinateSystemList[CSN].Parameters[4],
+                                CoordinateSystemList[CSN].Parameters[3],
+                                CoordinateSystemList[CSN].Parameters[2]);
+         end;
+
+       2 : begin
+           OutputH := H;
+           GaussKrugerToGeo(DatumN,x,y,OutputB,OutputL,CoordinateSystemList[CSN].Parameters[1],
+                                CoordinateSystemList[CSN].Parameters[0],
+                                CoordinateSystemList[CSN].Parameters[4],
+                                CoordinateSystemList[CSN].Parameters[3],
+                                CoordinateSystemList[CSN].Parameters[2]);
+         end;
+
+       1 : begin
+
+           ECEFToGeo(DatumN, X, Y, H,OutputB,OutputL,OutputH);
+       end;
+
+       0 : begin
+           OutputB := X;
+           OutputL := Y;
+           OutputH := H;
+         end;
+    end;
+
+end;
+
+procedure DatumToCoordinateSystem(CSN: integer; B, L, H: Double; var OutputX, OutputY, OutputH: Double);
+var ProjType: integer;
+    DatumN: integer;
+begin
+
+   try
+     ProjType:= CoordinateSystemList[CSN].ProjectionType;
+     DatumN  :=  CoordinateSystemList[CSN].DatumN;
+   except
+     OutputX := 0;
+     OutputY := 0;
+     OutputH := 0;
+     exit;
+   end;
+
+    Case ProjType of
+       4 : begin
+           OutputH := H;
+           //// UTMSouth
+          GeoToUTM(DatumN,B,L, true, OutputX, OutputY,CoordinateSystemList[CSN].Parameters[1],
+                                CoordinateSystemList[CSN].Parameters[0],
+                                CoordinateSystemList[CSN].Parameters[4],
+                                CoordinateSystemList[CSN].Parameters[3],
+                                CoordinateSystemList[CSN].Parameters[2]) ;
+         end;
+
+       3 : begin
+           OutputH := H;
+           //// UTM
+
+           GeoToUTM(DatumN,B,L, false, OutputX, OutputY,CoordinateSystemList[CSN].Parameters[1],
+                                CoordinateSystemList[CSN].Parameters[0],
+                                CoordinateSystemList[CSN].Parameters[4],
+                                CoordinateSystemList[CSN].Parameters[3],
+                                CoordinateSystemList[CSN].Parameters[2]) ;
+         end;
+
+       2 : begin
+           OutputH := H;
+           //// Gauss
+           GeoToGaussKruger(DatumN, B,L,OutputX,OutputY,CoordinateSystemList[CSN].Parameters[1],
+                                CoordinateSystemList[CSN].Parameters[0],
+                                CoordinateSystemList[CSN].Parameters[4],
+                                CoordinateSystemList[CSN].Parameters[3],
+                                CoordinateSystemList[CSN].Parameters[2]);
+         end;
+
+       1 : begin
+          //// ECEF
+          GeoToECEF(DatumN,B,L,H,OutputX,OutputY,OutputH);
+
+
+       end;
+
+       0 : begin
+           ///// LATLON
+           OutputX := B;
+           OutputY := L;
+           OutputH := H;
+         end;
+    end;
+end;
+
+end.

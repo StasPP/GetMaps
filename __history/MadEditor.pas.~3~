@@ -1,0 +1,12 @@
+unit MadEditor;
+
+interface
+
+uses MapFunctions, GeoFunctions, TabFunctions, Vectors2,
+     AbstractCanvas, AbstractDevices, AsphyreImages, AsphyreTypes, AsphyreDb,
+     Classes, FLoader, SysUtils, GeoClasses, GeoString, Dialogs, DrawFunctions,
+     BasicMapObjects;
+
+implementation
+
+end.

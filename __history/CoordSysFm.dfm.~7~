@@ -1,0 +1,60 @@
+object CSForm: TCSForm
+  Left = 0
+  Top = 0
+  AutoSize = True
+  BorderStyle = bsDialog
+  Caption = #1042#1099#1073#1086#1088' '#1089#1080#1089#1090#1077#1084#1099' '#1082#1086#1086#1088#1076#1080#1085#1072#1090
+  ClientHeight = 265
+  ClientWidth = 437
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  OldCreateOrder = False
+  Position = poScreenCenter
+  OnActivate = FormActivate
+  OnShow = FormShow
+  PixelsPerInch = 96
+  TextHeight = 13
+  object Bevel1: TBevel
+    Left = 0
+    Top = 0
+    Width = 437
+    Height = 265
+    Shape = bsSpacer
+  end
+  object ComboBox2: TComboBox
+    Left = 8
+    Top = 8
+    Width = 421
+    Height = 22
+    Style = csOwnerDrawFixed
+    ItemHeight = 16
+    TabOrder = 0
+    OnChange = ComboBox2Change
+  end
+  object ListBox4: TListBox
+    Left = 8
+    Top = 36
+    Width = 421
+    Height = 185
+    Hint = '111'
+    ItemHeight = 13
+    ParentShowHint = False
+    ShowHint = True
+    TabOrder = 1
+    OnClick = ListBox4Click
+    OnDblClick = Button1Click
+  end
+  object Button1: TButton
+    Left = 120
+    Top = 227
+    Width = 201
+    Height = 25
+    Caption = #1042#1099#1073#1088#1072#1090#1100
+    TabOrder = 2
+    OnClick = Button1Click
+  end
+end

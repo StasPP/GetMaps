@@ -1,0 +1,127 @@
+package AsphyrePackage;
+
+{$R *.res}
+{$R 'AsphyreReg.dcr'}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO ON}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS ON}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION ON}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO ON}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES OFF}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST OFF}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$DESCRIPTION 'Asphyre eXtreme'}
+{$LIBPREFIX 'Asphyre'}
+{$LIBVERSION '1.0'}
+{$IMPLICITBUILD OFF}
+
+requires
+  rtl,
+  vcl,
+  vcljpg;
+
+contains
+  AsphyreDef in 'AsphyreDef.pas',
+  AsphyreDevices in 'AsphyreDevices.pas',
+  AsphyreReg in 'AsphyreReg.pas',
+  Direct3D9 in 'Direct3D9.pas',
+  DirectInput in 'DirectInput.pas',
+  DXBase in 'DXBase.pas',
+  DXTypes in 'DXTypes.pas',
+  AsphyreSubsc in 'AsphyreSubsc.pas',
+  AsphyreBmpLoad in 'AsphyreBmpLoad.pas',
+  AsphyreCanvas in 'AsphyreCanvas.pas',
+  AsphyreConv in 'AsphyreConv.pas',
+  AsphyreData in 'AsphyreData.pas',
+  AsphyreImages in 'AsphyreImages.pas',
+  AsphyreJPG in 'AsphyreJPG.pas',
+  AsphyrePNG in 'AsphyrePNG.pas',
+  AsphyreTGA in 'AsphyreTGA.pas',
+  asphyrezlib in 'asphyrezlib.pas',
+  DXTextures in 'DXTextures.pas',
+  ImageDrawing in 'ImageDrawing.pas',
+  ImageFx in 'ImageFx.pas',
+  pngextra in 'pngextra.pas',
+  pngimage in 'pngimage.pas',
+  pnglang in 'pnglang.pas',
+  StreamEx in 'StreamEx.pas',
+  AsphyreTimers in 'AsphyreTimers.pas',
+  Asphyre2D in 'Asphyre2D.pas',
+  AsphyreBase64 in 'AsphyreBase64.pas',
+  AsphyreBillboards in 'AsphyreBillboards.pas',
+  AsphyreBmp in 'AsphyreBmp.pas',
+  AsphyreCameras in 'AsphyreCameras.pas',
+  AsphyreDb in 'AsphyreDb.pas',
+  AsphyreFacing in 'AsphyreFacing.pas',
+  AsphyreFog in 'AsphyreFog.pas',
+  AsphyreFonts in 'AsphyreFonts.pas',
+  AsphyreJoystick in 'AsphyreJoystick.pas',
+  AsphyreKeyboard in 'AsphyreKeyboard.pas',
+  AsphyreLandscapes in 'AsphyreLandscapes.pas',
+  AsphyreLights in 'AsphyreLights.pas',
+  AsphyreMaterials in 'AsphyreMaterials.pas',
+  AsphyreMath in 'AsphyreMath.pas',
+  AsphyreMatrix in 'AsphyreMatrix.pas',
+  AsphyreMD5 in 'AsphyreMD5.pas',
+  AsphyreMeshes in 'AsphyreMeshes.pas',
+  AsphyreModels in 'AsphyreModels.pas',
+  AsphyreMouse in 'AsphyreMouse.pas',
+  AsphyreParticles3D in 'AsphyreParticles3D.pas',
+  AsphyreParticles in 'AsphyreParticles.pas',
+  AsphyrePrimitives in 'AsphyrePrimitives.pas',
+  AsphyrePrimitivesEx in 'AsphyrePrimitivesEx.pas',
+  AsphyreStates in 'AsphyreStates.pas',
+  AsphyreTextures in 'AsphyreTextures.pas',
+  BBTypes in 'BBTypes.pas',
+  BitmapFonts in 'BitmapFonts.pas',
+  Blowfish in 'Blowfish.pas',
+  BlowfishTools in 'BlowfishTools.pas',
+  ClassesEx in 'ClassesEx.pas',
+  DXMeshes in 'DXMeshes.pas',
+  FacingTypes in 'FacingTypes.pas',
+  GuiComponents in 'GuiComponents.pas',
+  GuiControls in 'GuiControls.pas',
+  GuiForms in 'GuiForms.pas',
+  GuiRegistry in 'GuiRegistry.pas',
+  GuiTaskbar in 'GuiTaskbar.pas',
+  GuiTypes in 'GuiTypes.pas',
+  NetBufs in 'NetBufs.pas',
+  NetComs in 'NetComs.pas',
+  NetLinks in 'NetLinks.pas',
+  PackedNums in 'PackedNums.pas',
+  pxfm in 'pxfm.pas',
+  Vectors2 in 'Vectors2.pas',
+  GuiButton in 'GuiButton.pas',
+  GuiCheckBox in 'GuiCheckBox.pas',
+  GuiEdit in 'GuiEdit.pas',
+  GuiLabel in 'GuiLabel.pas',
+  GuiListbox in 'GuiListbox.pas',
+  GuiRadioButton in 'GuiRadioButton.pas',
+  GuiScroll in 'GuiScroll.pas',
+  LibXmlParser in 'LibXmlParser.pas',
+  TypesEx in 'TypesEx.pas',
+  AsphyreLoader in 'AsphyreLoader.pas',
+  AsphyreScreener in 'AsphyreScreener.pas',
+  MultiCanvas in 'MultiCanvas.pas',
+  GuiBasic in 'GuiBasic.pas',
+  GuiGauge in 'GuiGauge.pas',
+  GuiPaint in 'GuiPaint.pas',
+  AsphyreNet in 'AsphyreNet.pas',
+  ExchLinks in 'ExchLinks.pas',
+  NetExch in 'NetExch.pas';
+
+//---------------------------------------------------------------------------
+end.

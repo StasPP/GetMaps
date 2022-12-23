@@ -1,0 +1,17 @@
+program GetMap;
+
+uses
+  Forms,
+  Unit1 in 'Unit1.pas' {Form1},
+  GetGoogle in 'Google\GetGoogle.pas' {WForm},
+  GoogleDownload in 'GoogleDownload.pas',
+  AsdbMap in 'AsdbMap.pas';
+
+{$R *.res}
+
+begin
+  Application.Initialize;
+  Application.CreateForm(TForm1, Form1);
+  Application.CreateForm(TWForm, WForm);
+  Application.Run;
+end.

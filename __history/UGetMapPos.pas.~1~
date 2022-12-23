@@ -1,0 +1,90 @@
+unit UGetMapPos;
+
+interface
+
+uses
+  Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
+  Dialogs, StdCtrls, ExtCtrls, jpeg;
+
+type
+  TGetMapPos = class(TForm)
+    Image1: TImage;
+    Panel1: TPanel;
+    Label1: TLabel;
+    Button1: TButton;
+    Image2: TImage;
+    Label2: TLabel;
+    procedure Image1MouseMove(Sender: TObject; Shift: TShiftState; X,
+      Y: Integer);
+    procedure Image1MouseUp(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure Button1Click(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    ResultB, ResultL :String;
+    { Public declarations }
+  end;
+
+var
+  GetMapPos: TGetMapPos;
+  Bs, Ls :String;
+
+implementation
+
+{$R *.dfm}
+
+procedure TGetMapPos.Image1MouseMove(Sender: TObject; Shift: TShiftState;
+  X, Y: Integer);
+var
+    S1, S2: String;
+    B, L: real;
+begin
+  B := - (Y+1 - Image1.Height div 2 )div 2;
+  L := (X+1 - Image1.Width div 2 )div 2;
+
+  if B < 0 Then
+  begin
+     B := -B;
+     S1 := 'S ';
+  end
+   else
+    S1 := 'N ';
+
+  if L < 0 Then
+  begin
+     L := -L;
+     S2 := 'W ';
+  end
+   else
+    S2 := 'E ';
+
+  Bs := S1+ IntToStr(Round(B));
+  Ls :=  S2 +  IntToStr(Round(L));
+  Label1.Caption := Bs + ' ' + Ls;
+
+end;
+
+procedure TGetMapPos.Image1MouseUp(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+begin
+  ResultB := Bs;
+  ResultL := Ls;
+
+  Label2.Caption := Bs + #13 + Ls;
+  Image2.Left := Image1.Left+ X-7; Image2.Top :=Image1.Top + Y-7;
+
+  Label2.Left := Image2.Left + 18;
+  Label2.Top := Image2.Top;
+
+  Label2.Show;
+  Image2.Show;
+
+end;
+
+procedure TGetMapPos.Button1Click(Sender: TObject);
+begin
+  close;
+end;
+
+end.

@@ -1,0 +1,59 @@
+unit HUD1;
+
+interface
+
+uses MapFunctions, GeoFunctions, TabFunctions, Vectors2,
+     AbstractCanvas, AbstractDevices, AsphyreImages, AsphyreTypes;
+
+procedure ScaleLine(AsphCanvas:TAsphyreCanvas; BigSize, isRight: Boolean;
+      Msign, KmSign, FontName :String; IntColor: Cardinal);
+
+implementation
+
+procedure ScaleLine(AsphCanvas:TAshphyreCanvas; BigSize, isRight: Boolean;
+      Msign, KmSign, FontName :String; IntColor: Cardinal);
+var
+    s, s2 : String;
+    w : integer;
+    X1, X2, Y2 : integer;
+begin
+    if Scale=0 then
+         exit;
+
+    w := trunc(TMashtab[Mashtab]/Scale);
+
+    if isRight then
+    Begin
+      X1 := DispSize.X-20 - w;
+      X2 := DispSize.X;
+    End
+      else
+      Begin
+        X1 := 0;
+        X2 := w + 20;
+      End;
+
+    if isBig then
+       Y2 := 20
+        else
+          Y2 := 10;
+
+    AsphCanvas.FillRect(RECT( X, DispSize.Y - Y2*2, X2, DispSize.Y), IntColor);
+
+    MyLine(AsphCanvas, X1 + 10, DispSize.Y - Y2/2, X1 + 10, DispSize.Y - 5,
+           false, false, $FFFFFFFF);
+
+    MyLine(AsphCanvas, X2 - 10, DispSize.Y - Y2/2, X2 - 10, DispSize.Y - 5,
+           false, false, $FFFFFFFF);
+
+    MyLine(AsphCanvas, X1 + 10, DispSize.Y - 5, X2-10, DispSize.Y - 5, false,
+           false, $FFFFFFFF);
+
+    w := trunc(w/2 + AsphFonts[Font0].TextWidth(MashtabNames[Mashtab])/2) ;
+
+    AsphFonts[Font0].TextOut( Point2(DisplaySize.X - w -10, DisplaySize.Y - 25),
+                              MashtabNames[Mashtab], clWhite2, 1.0);
+
+end;
+
+end.

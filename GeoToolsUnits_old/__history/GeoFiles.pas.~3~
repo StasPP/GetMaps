@@ -1,0 +1,469 @@
+unit GeoFiles;
+
+///// Шевчук С. 2016
+
+interface
+
+uses GeoClasses, GeoFunctions, GeoString, Classes;
+
+  function LoadEllipsoidFromFile(FileName : String):integer;
+  function LoadEllipsoidsFromDirectory(DirName : String):integer;
+  function SaveEllipsoidToFile(FileName : String; E:TEllipsoid):boolean;
+
+  function LoadDatumFromFile(FileName : String):integer;
+  function LoadDatumsFromDirectory(DirName : String):integer;
+  function SaveDatumToFile(FileName : String; D:TDatum):boolean;
+
+  function LoadCoordinateSystemFromFile(FileName : String):integer;
+  function LoadCoordinateSystemsFromDirectory(DirName : String):integer;
+  function SaveCoordinateSystemToFile(FileName : String; CS:TCoordinateSystem;
+                                      ParNames:TStringList):boolean;
+
+  function GeoInit(FileName:String):String;
+
+  procedure GeoTranslate(Old, New, Dir:String);
+
+implementation
+
+uses SysUtils;
+const SuccessMsg =  'Датумы, эллипсоиды и системы координат успешно загружены';
+      ErrMsg =  'Ошибка загрузки. Необходим перезапуск';
+
+
+procedure AddFiles(Dir:string; var FileList:TStringList);
+var
+   SearchRec : TSearchrec; //Запись для поиска
+begin
+    if FindFirst(Dir + '*.*', faAnyFile, SearchRec) = 0 then
+    begin
+      if (SearchRec.Name<> '')
+        and(SearchRec.Name <> '.')
+        and(SearchRec.Name <> '..')
+        and not ((SearchRec.Attr and faDirectory) = faDirectory) then
+          FileList.Add(SearchRec.Name);
+      while FindNext(SearchRec) = 0 do
+        if (SearchRec.Name <> '')
+          and(SearchRec.Name <> '.')
+          and(SearchRec.Name <> '..')
+          and not ((SearchRec.Attr and faDirectory) = faDirectory)  then
+             FileList.Add(SearchRec.Name);
+      FindClose(Searchrec);
+    end;
+end;
+
+///////////////////////////////////////////////// Ellipsoids ///////////////////////////
+
+function GetAlphaFromString(s:String):Double;
+var i, chisl:integer;
+    znam : Double;
+begin
+  for i:=1 to length(s) do
+    if (s[i]= '/') or  (s[i] = ':') then
+      break;
+  if i <> length(s) then
+  begin
+    chisl := StrToInt(copy(s,1,i-1));
+    znam := StrToFloat2(copy(s,i+1,length(s)-i+1));
+    GetAlphaFromString := chisl/znam;
+  end
+   else
+      GetAlphaFromString := StrToFloat2(s);
+end;
+
+function LoadEllipsoidFromFile(FileName : String):integer;
+ var S :TStringList;
+     name, capt : string;
+     a,alpha : Double;
+Begin
+ LoadEllipsoidFromFile :=-1;
+ try
+   S := TStringList.Create;
+   S.LoadFromFile(Filename);
+   name := S[1];
+   capt := S[4];
+   a := StrToFloat2(s[7]);
+   alpha := GetAlphaFromString(s[10]);
+   S.Destroy;
+   LoadEllipsoidFromFile := CreateEllipsoid(Name, FileName, Capt, a, alpha);
+ except
+   LoadEllipsoidFromFile := -1;
+ end;
+End;
+
+function LoadEllipsoidsFromDirectory(DirName : String):integer;
+var FileList: TSTringList;
+    i : integer;
+Begin
+  FileList := TStringList.Create;
+  If DirName[Length(DirName)] <> '\' then
+      DirName := DirName + '\';
+
+  AddFiles (DirName, FileList);
+  Result := 0;
+
+  for i := 0 to  FileList.Count-1 do
+    if LoadEllipsoidFromFile(DirName + FileList[i])>-1 then
+       Inc(Result);
+
+  FileList.Destroy;
+end;
+
+function SaveEllipsoidToFile(FileName : String; E:TEllipsoid):boolean;
+var
+    S: TStringList;
+begin
+    Result := False;
+
+    S:= TStringList.Create;
+    try
+      S.Add('Имя:');
+      S.Add(E.Name);
+      S.Add('');
+      S.Add('Название:');
+      S.Add(E.Caption);
+      S.Add('');
+      S.Add('Большая полуось:');
+      S.Add(FloatTostr(E.a));
+      S.Add('');
+      S.Add('Cжатие:');
+      S.Add('1/'+FloatTostr(1/E.alpha));
+      S.Add('');
+      S.SaveToFile(FileName);
+      Result := True;
+   except
+   end;
+
+   LoadEllipsoidFromFile(Filename);
+
+   RefreshDatums;
+   S.Destroy;
+end;
+
+/////////////////// DATUMs  ///////////////////////////////////////////////////////////////////
+
+function LoadDatumFromFile(FileName : String):integer;
+ var S :TStringList;
+     i, j: integer;
+     name, capt, ElName : string;
+     a,alpha : Double;
+Begin
+ LoadDatumFromFile := -1;
+ try
+   S := TStringList.Create;
+   S.LoadFromFile(Filename);
+   name := S[1];
+   capt := S[4];
+   ElName := S[7];
+
+   Result := CreateDatum(Name, FileName, Capt, ElName);
+
+   if Result = -1 then
+   begin
+     S.Destroy;
+     exit;
+   end;
+
+   j :=10;
+   i :=0;
+   while s[i+j]<>'' do
+   begin
+     AddProjection(Result,s[i+j]);
+     inc(i);
+   end;
+
+   j := j+i+1;
+   i :=0;
+   while s.Count > j + (i+1)*21 -2 do
+   Begin
+      AddConversionProperties(Result, s[j + i*21 +3],
+              StrToFloat2(s[j + i*21 +7]), StrToFloat2(s[j + i*21 +9]),
+              StrToFloat2(s[j + i*21 +11]), StrToFloat2(s[j + i*21 +13]),
+              StrToFloat2(s[j + i*21 +15]), StrToFloat2(s[j + i*21 +17]),
+              StrToFloat2(s[j + i*21 +19])*0.000001 );
+      Inc(i);
+   End;
+
+   S.Destroy;
+ except
+   LoadDatumFromFile := -1;
+ end;
+
+end;
+
+
+function LoadDatumsFromDirectory(DirName : String):integer;
+var FileList: TSTringList;
+    i : integer;
+Begin
+  FileList := TStringList.Create;
+  If DirName[Length(DirName)] <> '\' then
+      DirName := DirName + '\';
+
+  AddFiles (DirName, FileList);
+  Result := 0;
+
+  for i := 0 to  FileList.Count-1 do
+    if LoadDatumFromFile(DirName + FileList[i])>-1 then
+       Inc(Result);
+
+  FileList.Destroy;
+end;
+
+function SaveDatumToFile(FileName : String; D:TDatum):boolean;
+var i:integer;
+    S: TStringList;
+begin
+    Result := False;
+
+    S:= TStringList.Create;
+    try
+      S.Add('Имя:');
+      S.Add(D.Name);
+      S.Add('');
+      S.Add('Название:');
+      S.Add(D.Caption);
+      S.Add('');
+      S.Add('Эллипсоид:');
+      S.Add(D.Ellipsoid.Name);
+      S.Add('');
+      S.Add('Доступные проекции:');
+      for i := 0 to Length(D.Projections)-1 do
+        S.Add(D.Projections[i]);
+
+      S.Add('');
+
+      for i := 0 to Length(D.ConvertData)-1 do
+      begin
+        S.Add('-----');
+        S.Add('');
+        S.Add('Связан с:');
+        S.Add(D.ConvertData[i].ConvertDatumName);
+        if D.ConvertData[i].BadData then
+          S[S.Count-1]:= S[S.Count-1]+'*';
+        S.Add('');
+        S.Add('Параметры:');
+        S.Add('dX (м):');
+        S.Add(FloatToStr(D.ConvertData[i].dx)) ;
+        S.Add('dY (м):');
+        S.Add(FloatToStr(D.ConvertData[i].dy)) ;
+        S.Add('dZ (м):');
+        S.Add(FloatToStr(D.ConvertData[i].dz)) ;
+        S.Add('wx ("):');
+        S.Add(FloatToStr(D.ConvertData[i].wx)) ;
+        S.Add('wy ("):');
+        S.Add(FloatToStr(D.ConvertData[i].wy)) ;
+        S.Add('wz ("):');
+        S.Add(FloatToStr(D.ConvertData[i].wz)) ;
+        S.Add('m (ppm):');
+        S.Add(FloatToStr(D.ConvertData[i].ms*1000000)) ;
+        S.Add('');
+      end;
+
+
+      S.SaveToFile(FileName);
+      Result := True;
+   except
+   end;
+
+   LoadDatumFromFile(Filename);
+   RefreshDatums;
+   S.Destroy;
+end;
+
+/////  COORD. SYSTEMs //////////////////////////////////////////////////////////////////////
+
+function LoadCoordinateSystemFromFile(FileName : String):integer;
+var  S :TStringList;
+     i, j: integer;
+     name, capt, DatumName, Proj, Cat : string;
+     Param: Double;
+Begin
+ LoadCoordinateSystemFromFile := -1;
+ S := TStringList.Create;
+ try
+
+   S.LoadFromFile(Filename);
+   name := S[1];
+   capt := S[4];
+   DatumName := S[7];
+   Cat := S[10];
+   Proj := S[13];
+
+   Result := CreateCoordinateSystem(Name, Filename, Capt, DatumName, Cat, Proj);
+
+   if Result <> -1 then
+   begin
+
+      j :=16;
+      i :=0;
+
+      while (i*3+j <= S.Count-1) do
+      begin
+        Param := StrToFloat2(s[i*3+j]);
+        AddCoordinateSystemParameter(Name, Param);
+        inc(i);
+      end;
+
+   end;
+ except
+   LoadCoordinateSystemFromFile := -1;
+ end;
+  S.Destroy;
+end;
+
+function LoadCoordinateSystemsFromDirectory(DirName : String):integer;
+var FileList: TSTringList;
+    i : integer;
+Begin
+  FileList := TStringList.Create;
+  If DirName[Length(DirName)] <> '\' then
+      DirName := DirName + '\';
+
+  AddFiles (DirName, FileList);
+  Result := 0;
+
+  for i := 0 to  FileList.Count-1 do
+    if LoadCoordinateSystemFromFile(DirName + FileList[i])>-1 then
+       Inc(Result);
+
+  FileList.Destroy;
+end;
+
+function SaveCoordinateSystemToFile(FileName : String; CS:TCoordinateSystem;
+                                    ParNames:TStringList):boolean;
+var i:integer;
+    S: TStringList;
+begin
+    Result := False;
+
+    S:= TStringList.Create;
+    try
+      S.Add('Имя:');
+      S.Add(CS.Name);
+      S.Add('');
+      S.Add('Название:');
+      S.Add(CS.Caption);
+      S.Add('');
+      S.Add('Датум:');
+      S.Add(DatumList[CS.DatumN].Name);
+      S.Add('');
+      S.Add('Тип проекции:');
+      S.Add(ProjectionNames[CS.ProjectionType]);
+      S.Add('');
+      S.Add('Категория:');
+      S.Add(CS.Category);
+      S.Add('');
+
+      For i := 0 to length(CS.Parameters)-1 do
+      begin
+        S.Add(ParNames[i]);
+        S.Add(FloatToStr(CS.Parameters[i]));
+        S.Add('');
+      end;
+
+      S.SaveToFile(FileName);
+      Result := True;
+   except
+   end;
+
+   LoadCoordinatesystemFromFile(Filename);
+   RefreshCoorinateSystemCategory;
+   S.Destroy;
+end;
+
+////////////////////////////////////////////////// INIT ALL ///////////////////////////
+
+function GeoInit(FileName:String):String;
+var S: TStringList;
+begin
+  S := TStringList.Create;
+  try
+    S.LoadFromFile(FileName);
+    LoadEllipsoidsFromDirectory(S[0]);
+    LoadDatumsFromDirectory(S[1]);
+    LoadCoordinateSystemsFromDirectory(S[2]);
+    Result := SuccessMsg;
+  except
+     Result := ErrMsg;
+  end;
+  S.Destroy;
+end;
+
+procedure GeoTranslate(Old, New, Dir :String);
+var
+  I, J, K :integer;
+  OldS, NewS:TStringList;
+begin
+  OldS := TStringList.Create;
+  NewS := TStringList.Create;
+
+  if Dir[Length(Dir)]<>'\' then
+     Dir := Dir + '\';
+
+     {var EllipsoidList: array of TEllipsoid;
+      DatumList: array of TDatum;
+      TransformationList : array of TConvertData;
+      CoordinateSystemList : array of TCoordinateSystem;
+      CoorinateSystemCategories : array of String;}
+
+  Olds.LoadFromFile(Dir+Old+'\CS.txt');
+  Olds.LoadFromFile(Dir+New+'\CS.txt');
+
+  for I := 0 to Olds.Count - 1 do
+  Begin
+     /// Ellipsoids
+     for J := 0 to Length(EllipsoidList) - 1 do
+     Begin
+       K := Pos(OldS[I], EllipsoidList[J].Caption);
+       if  K > 0 then
+       Begin
+         Delete(EllipsoidList[J].Caption,K,Length(OldS[I]));
+         Insert(NewS[I], EllipsoidList[J].Caption,K);
+       End;
+     End;
+
+     //// Datums
+     for J := 0 to Length(DatumList) - 1 do
+     Begin
+       K := Pos(OldS[I], DatumList[J].Caption);
+       if  K > 0 then
+       Begin
+         Delete(DatumList[J].Caption,K,Length(OldS[I]));
+         Insert(NewS[I], DatumList[J].Caption,K);
+       End;
+     End;
+
+     /// CSList
+     for J := 0 to Length(CoordinateSystemList) - 1 do
+     Begin
+       K := Pos(OldS[I], CoordinateSystemList[J].Caption);
+       if  K > 0 then
+       Begin
+         Delete(CoordinateSystemList[J].Caption,K,Length(OldS[I]));
+         Insert(NewS[I], CoordinateSystemList[J].Caption,K);
+       End;
+
+       K := Pos(OldS[I], CoordinateSystemList[J].Category);
+       if  K > 0 then
+       Begin
+         Delete(CoordinateSystemList[J].Category,K,Length(OldS[I]));
+         Insert(NewS[I], CoordinateSystemList[J].Category,K);
+       End;
+     End;
+
+     /// CSCats
+     for J := 0 to Length(CoorinateSystemCategories) - 1 do
+     Begin
+       K := Pos(OldS[I], CoorinateSystemCategories[J]);
+       if  K > 0 then
+       Begin
+         Delete(CoorinateSystemCategories[J],K,Length(OldS[I]));
+         Insert(NewS[I], CoorinateSystemCategories[J],K);
+       End;
+     End;
+  End;
+  OldS.Free;
+  NewS.Free;
+end;
+
+end.
